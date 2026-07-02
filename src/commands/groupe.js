@@ -2,212 +2,198 @@ const { reply, isAdmin, isBotAdmin, formatJid } = require('../lib/utils');
 const config = require('../config');
 
 async function groupeMenu(sock, msg, args, from, sender) {
-  const isGroup = from.endsWith('@g.us');
-  const botAdmin = isGroup ? await isBotAdmin(sock, from) : false;
+  const isGroup    = from.endsWith('@g.us');
+  const botAdmin   = isGroup ? await isBotAdmin(sock, from) : false;
   const senderAdmin = isGroup ? await isAdmin(sock, from, sender) : false;
 
   const cmd = args[0]?.toLowerCase();
 
   switch (cmd) {
-    // ───────────────────────────────────────────
-    case 'tagall':
-    case 'tousmentionner': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      const meta = await sock.groupMetadata(from);
+
+    case 'tagall': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      const meta    = await sock.groupMetadata(from);
       const members = meta.participants;
-      let text = `╔═══ 📢 *TAG ALL* ═══╗\n`;
-      text += `║ 👥 ${members.length} membres\n╚═══════════════════╝\n\n`;
-      const mentions = members.map((m) => m.id);
-      members.forEach((m) => { text += `@${formatJid(m.id)}\n`; });
+      let text = `╔═══ 📢 *TAG ALL* ═══╗\n║ 👥 ${members.length} members\n╚═══════════════════╝\n\n`;
+      const mentions = members.map(m => m.id);
+      members.forEach(m => { text += `@${formatJid(m.id)}\n`; });
       await sock.sendMessage(from, { text, mentions }, { quoted: msg });
       break;
     }
 
-    case 'hidetag':
-    case 'taginvisible': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      const meta = await sock.groupMetadata(from);
-      const mentions = meta.participants.map((m) => m.id);
-      const text = args.slice(1).join(' ') || '📢 Message du groupe';
+    case 'hidetag': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      const meta     = await sock.groupMetadata(from);
+      const mentions = meta.participants.map(m => m.id);
+      const text     = args.slice(1).join(' ') || '📢 Group message';
       await sock.sendMessage(from, { text, mentions }, { quoted: msg });
       break;
     }
 
-    case 'kick':
-    case 'expulser': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin pour expulser.');
+    case 'kick': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to kick members.');
       const target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
         || (args[1] ? args[1].replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-      if (!target) return reply(sock, msg, '❌ Mentionne le membre à expulser.');
+      if (!target) return reply(sock, msg, '❌ Mention the member to kick.');
       await sock.groupParticipantsUpdate(from, [target], 'remove');
-      await reply(sock, msg, `✅ @${formatJid(target)} a été expulsé.`);
+      await reply(sock, msg, `✅ @${formatJid(target)} has been kicked.`);
       break;
     }
 
-    case 'add':
-    case 'ajouter': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin pour ajouter.');
+    case 'add': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to add members.');
       const num = args[1]?.replace(/[^0-9]/g, '');
-      if (!num) return reply(sock, msg, '❌ Usage: !add <numéro>');
+      if (!num) return reply(sock, msg, '❌ Usage: .add <number>');
       const jid = num + '@s.whatsapp.net';
       await sock.groupParticipantsUpdate(from, [jid], 'add');
-      await reply(sock, msg, `✅ ${num} a été ajouté au groupe.`);
+      await reply(sock, msg, `✅ +${num} has been added to the group.`);
       break;
     }
 
     case 'promote':
     case 'admin': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to promote members.');
       const target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-      if (!target) return reply(sock, msg, '❌ Mentionne le membre à promouvoir.');
+      if (!target) return reply(sock, msg, '❌ Mention the member to promote.');
       await sock.groupParticipantsUpdate(from, [target], 'promote');
-      await reply(sock, msg, `✅ @${formatJid(target)} est maintenant admin.`);
+      await reply(sock, msg, `✅ @${formatJid(target)} is now an admin.`);
       break;
     }
 
-    case 'demote':
-    case 'retrogader': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+    case 'demote': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to demote members.');
       const target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-      if (!target) return reply(sock, msg, '❌ Mentionne le membre à rétrograder.');
+      if (!target) return reply(sock, msg, '❌ Mention the member to demote.');
       await sock.groupParticipantsUpdate(from, [target], 'demote');
-      await reply(sock, msg, `✅ @${formatJid(target)} n'est plus admin.`);
+      await reply(sock, msg, `✅ @${formatJid(target)} is no longer an admin.`);
       break;
     }
 
-    case 'mute':
-    case 'fermer': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+    case 'mute': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to mute the group.');
       await sock.groupSettingUpdate(from, 'announcement');
-      await reply(sock, msg, '🔇 Groupe en lecture seule. Seuls les admins peuvent écrire.');
+      await reply(sock, msg, '🔇 Group is now read-only. Only admins can send messages.');
       break;
     }
 
-    case 'unmute':
-    case 'ouvrir': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+    case 'unmute': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to unmute the group.');
       await sock.groupSettingUpdate(from, 'not_announcement');
-      await reply(sock, msg, '🔊 Groupe ouvert. Tout le monde peut écrire.');
+      await reply(sock, msg, '🔊 Group is now open. Everyone can send messages.');
       break;
     }
 
-    case 'link':
-    case 'lien': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
+    case 'link': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
       const code = await sock.groupInviteCode(from);
-      await reply(sock, msg, `🔗 Lien du groupe:\nhttps://chat.whatsapp.com/${code}`);
+      await reply(sock, msg, `🔗 Group invite link:\nhttps://chat.whatsapp.com/${code}`);
       break;
     }
 
-    case 'revoke':
-    case 'reinitialiser': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+    case 'revoke': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to reset the link.');
       await sock.groupRevokeInvite(from);
-      await reply(sock, msg, '✅ Lien du groupe réinitialisé avec succès.');
+      await reply(sock, msg, '✅ Group invite link has been reset.');
       break;
     }
 
-    case 'setname':
-    case 'nomdgroupe': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+    case 'setname': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to change the name.');
       const name = args.slice(1).join(' ');
-      if (!name) return reply(sock, msg, '❌ Usage: !setname <nom>');
+      if (!name) return reply(sock, msg, '❌ Usage: .setname <name>');
       await sock.groupUpdateSubject(from, name);
-      await reply(sock, msg, `✅ Nom du groupe changé en: ${name}`);
+      await reply(sock, msg, `✅ Group name changed to: ${name}`);
       break;
     }
 
-    case 'setdesc':
-    case 'description': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+    case 'setdesc': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to change the description.');
       const desc = args.slice(1).join(' ');
-      if (!desc) return reply(sock, msg, '❌ Usage: !setdesc <description>');
+      if (!desc) return reply(sock, msg, '❌ Usage: .setdesc <description>');
       await sock.groupUpdateDescription(from, desc);
-      await reply(sock, msg, '✅ Description du groupe mise à jour.');
+      await reply(sock, msg, '✅ Group description updated.');
       break;
     }
 
     case 'info':
     case 'infosgroupe': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      const meta = await sock.groupMetadata(from);
-      const admins = meta.participants.filter((p) => p.admin).length;
-      const text = `╔═══ 📋 *INFO GROUPE* ═══╗
-║ 🏷️ Nom: ${meta.subject}
-║ 👥 Membres: ${meta.participants.length}
+      if (!isGroup) return reply(sock, msg, '❌ This command only works in groups.');
+      const meta   = await sock.groupMetadata(from);
+      const admins = meta.participants.filter(p => p.admin).length;
+      const text   = `╔═══ 📋 *GROUP INFO* ═══╗
+║ 🏷️  Name: ${meta.subject}
+║ 👥 Members: ${meta.participants.length}
 ║ 👑 Admins: ${admins}
-║ 📝 Desc: ${meta.desc || 'Aucune'}
+║ 📝 Desc: ${meta.desc || 'None'}
 ║ 🆔 ID: ${meta.id}
-║ 📅 Créé: ${new Date(meta.creation * 1000).toLocaleDateString('fr-FR')}
-╚══════════════════════════╝`;
+║ 📅 Created: ${new Date(meta.creation * 1000).toLocaleDateString('en-GB')}
+╚════════════════════════╝`;
       await reply(sock, msg, text);
       break;
     }
 
     case 'antilink': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      await reply(sock, msg, '🛡️ Protection anti-lien activée. Tout lien WhatsApp posté par un non-admin sera supprimé.');
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      await reply(sock, msg, '🛡️ Anti-link protection enabled. Any WhatsApp link posted by a non-admin will be deleted.');
       break;
     }
 
-    case 'ban':
-    case 'bannir': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      if (!botAdmin) return reply(sock, msg, '❌ Je dois être admin.');
+    case 'ban': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      if (!botAdmin)    return reply(sock, msg, '❌ I need to be an admin to ban members.');
       const target = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-      if (!target) return reply(sock, msg, '❌ Mentionne le membre à bannir.');
+      if (!target) return reply(sock, msg, '❌ Mention the member to ban.');
       await sock.groupParticipantsUpdate(from, [target], 'remove');
-      await reply(sock, msg, `🚫 @${formatJid(target)} a été banni du groupe.`);
+      await reply(sock, msg, `🚫 @${formatJid(target)} has been banned from the group.`);
       break;
     }
 
-    case 'welcome':
-    case 'bienvenue': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
-      if (!senderAdmin) return reply(sock, msg, '❌ Réservé aux admins.');
-      const msg2 = args.slice(1).join(' ') || '👋 Bienvenue dans le groupe !';
-      await reply(sock, msg, `✅ Message de bienvenue défini:\n${msg2}`);
+    case 'welcome': {
+      if (!isGroup)     return reply(sock, msg, '❌ This command only works in groups.');
+      if (!senderAdmin) return reply(sock, msg, '❌ Only group admins can use this.');
+      const welcomeMsg = args.slice(1).join(' ') || '👋 Welcome to the group!';
+      await reply(sock, msg, `✅ Welcome message set:\n${welcomeMsg}`);
       break;
     }
 
     case 'poll':
     case 'sondage': {
-      if (!isGroup) return reply(sock, msg, '❌ Commande réservée aux groupes.');
+      if (!isGroup) return reply(sock, msg, '❌ This command only works in groups.');
       const parts = args.slice(1).join(' ').split('|');
-      if (parts.length < 3) return reply(sock, msg, '❌ Usage: !poll Question | Option1 | Option2');
+      if (parts.length < 3) return reply(sock, msg, '❌ Usage: .poll Question | Option1 | Option2');
       const question = parts[0].trim();
-      const options = parts.slice(1).map((o) => ({ optionName: o.trim() }));
+      const options  = parts.slice(1).map(o => o.trim());
       await sock.sendMessage(from, {
-        poll: { name: question, values: options.map((o) => o.optionName), selectableCount: 1 },
+        poll: { name: question, values: options, selectableCount: 1 },
       });
       break;
     }
 
     default:
-      return null; // Commande non gérée ici
+      return null;
   }
 }
 

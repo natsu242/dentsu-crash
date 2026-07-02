@@ -86,6 +86,8 @@ async function createSession(sessionId = null, io = null) {
       if (io) io.emit('sessions_update', getSessionsInfo());
       console.log(`[SESSION] ${sessionId} déconnecté. Reconnexion: ${shouldReconnect}`);
       if (shouldReconnect) {
+        // Supprimer l'ancienne entrée pour permettre la recréation
+        sessions.delete(sessionId);
         setTimeout(() => createSession(sessionId, io), 5000);
       } else {
         sessions.delete(sessionId);

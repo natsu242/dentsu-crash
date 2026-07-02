@@ -297,7 +297,6 @@ async function handleMessage(sock, msg, store) {
         break;
       }
 
-      case 'info':
       case 'botinfo': {
         const { getSessionCount } = require('./lib/session-manager');
         const text = `╔═══ 🤖 *BOT INFO* ═══╗
@@ -311,6 +310,27 @@ async function handleMessage(sock, msg, store) {
 ║ ⏱️ Uptime: ${Math.floor(process.uptime() / 60)}min
 ╚═══════════════════════╝`;
         await reply(sock, msg, text);
+        break;
+      }
+
+      // !info : info groupe si en groupe, sinon info bot
+      case 'info': {
+        if (isGroup) {
+          await groupeMenu(sock, msg, [command, ...args.slice(1)], from, sender);
+        } else {
+          const { getSessionCount } = require('./lib/session-manager');
+          const txt = `╔═══ 🤖 *BOT INFO* ═══╗
+║ 🏷️ Nom: ${config.botName}
+║ 📦 Version: v${config.version}
+║ 💻 Dev: ${config.dev}
+║ 👑 Owner: ${config.ownerName}
+║ 📱 Contact: wa.me/${config.ownerNumber}
+║ 📌 Préfixe: ${prefix}
+║ 📊 Sessions: ${getSessionCount()}/${config.maxSessions}
+║ ⏱️ Uptime: ${Math.floor(process.uptime() / 60)}min
+╚═══════════════════════╝`;
+          await reply(sock, msg, txt);
+        }
         break;
       }
 

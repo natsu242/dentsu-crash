@@ -15,10 +15,10 @@ function getMessageText(msg) {
   );
 }
 
-// Vérifier si c'est l'owner
+// Vérifier si c'est l'owner (accepte numéro pur ou JID complet)
 function isOwner(jid) {
-  const ownerJid = config.ownerNumber + '@s.whatsapp.net';
-  return jid === ownerJid;
+  const number = jid.replace('@s.whatsapp.net', '').replace(/[^0-9]/g, '');
+  return number === config.ownerNumber;
 }
 
 // Vérifier si c'est admin du groupe

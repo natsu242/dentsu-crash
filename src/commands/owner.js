@@ -4,7 +4,7 @@ const config = require('../config');
 const os = require('os');
 
 async function ownerMenu(sock, msg, args, from, sender) {
-  if (!isOwner(sender.replace('@s.whatsapp.net', ''))) {
+  if (!isOwner(sender)) {
     return reply(sock, msg, '❌ Cette commande est réservée au propriétaire du bot.');
   }
 

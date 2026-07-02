@@ -5,7 +5,7 @@ const path   = require('path');
 const config = require('../config');
 const {
   createSession, getSessionsInfo, deleteSession,
-  getSessionCount, requestPairing,
+  getSessionCount,
 } = require('../lib/session-manager');
 
 async function startWebServer() {

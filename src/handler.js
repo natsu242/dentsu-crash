@@ -263,8 +263,6 @@ async function sendWelcomeMessage(sock, ownerJid) {
   }
 }
 
-module.exports.sendWelcomeMessage = sendWelcomeMessage;
-
 // ─── Main message handler ──────────────────────────────────────────────────────
 async function handleMessage(sock, msg, store) {
   const from   = msg.key.remoteJid;
@@ -488,4 +486,4 @@ async function handleMessage(sock, msg, store) {
   }
 }
 
-module.exports = { handleMessage };
+module.exports = { handleMessage, sendWelcomeMessage };

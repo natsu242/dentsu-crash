@@ -1,54 +1,51 @@
 const express = require('express');
-const http = require('http');
+const http    = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
+const path   = require('path');
 const config = require('../config');
-const { createSession, getSessionsInfo, deleteSession, getSessionCount } = require('../lib/session-manager');
+const {
+  createSession, getSessionsInfo, deleteSession,
+  getSessionCount, requestPairing,
+} = require('../lib/session-manager');
 
 async function startWebServer() {
-  const app = express();
+  const app    = express();
   const server = http.createServer(app);
-  const io = new Server(server, {
+  const io     = new Server(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] },
   });
 
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
 
-  // ─── API Routes ────────────────────────────────
+  // ─── REST API ─────────────────────────────────────────────────────────────
 
-  // Info bot
-  app.get('/api/info', (req, res) => {
-    res.json({
-      botName: config.botName,
-      version: config.version,
-      dev: config.dev,
-      ownerName: config.ownerName,
-      ownerNumber: config.ownerNumber,
-      maxSessions: config.maxSessions,
-      activeSessions: getSessionCount(),
-    });
-  });
+  app.get('/api/info', (_, res) => res.json({
+    botName: config.botName,
+    version: config.version,
+    dev: config.dev,
+    ownerName: config.ownerName,
+    ownerNumber: config.ownerNumber,
+    maxSessions: config.maxSessions,
+    activeSessions: getSessionCount(),
+  }));
 
-  // Liste des sessions
-  app.get('/api/sessions', (req, res) => {
-    res.json({ sessions: getSessionsInfo() });
-  });
+  app.get('/api/sessions', (_, res) => res.json({ sessions: getSessionsInfo() }));
 
-  // Créer une nouvelle session
-  app.post('/api/sessions/create', async (req, res) => {
+  // POST /api/sessions/pair — start pairing with a phone number
+  app.post('/api/sessions/pair', async (req, res) => {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) return res.status(400).json({ error: 'phoneNumber is required.' });
+    if (getSessionCount() >= config.maxSessions)
+      return res.status(429).json({ error: `Session limit of ${config.maxSessions} reached.` });
     try {
-      if (getSessionCount() >= config.maxSessions) {
-        return res.status(429).json({ error: `Limite de ${config.maxSessions} sessions atteinte.` });
-      }
-      const { sessionId } = await createSession(null, io);
+      const { sessionId } = await createSession(null, io, phoneNumber);
       res.json({ success: true, sessionId });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // Supprimer une session
   app.delete('/api/sessions/:id', async (req, res) => {
     try {
       await deleteSession(req.params.id);
@@ -59,27 +56,15 @@ async function startWebServer() {
     }
   });
 
-  // QR code d'une session
-  app.get('/api/sessions/:id/qr', (req, res) => {
-    const { getAllSessions } = require('../lib/session-manager');
-    const sessions = getAllSessions();
-    const session = sessions.get(req.params.id);
-    if (!session) return res.status(404).json({ error: 'Session introuvable.' });
-    if (!session.qr) return res.status(204).json({ message: 'Pas de QR disponible.' });
-    res.json({ qr: session.qr });
-  });
+  app.get('/', (_, res) =>
+    res.sendFile(path.join(__dirname, 'public', 'index.html'))
+  );
 
-  // Page principale
-  app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  });
-
-  // ─── Socket.IO ─────────────────────────────────
+  // ─── Socket.IO ────────────────────────────────────────────────────────────
 
   io.on('connection', (socket) => {
-    console.log(`[WEB] Client connecté: ${socket.id}`);
+    console.log(`[WEB] Client connected: ${socket.id}`);
 
-    // Envoyer l'état actuel
     socket.emit('sessions_update', getSessionsInfo());
     socket.emit('bot_info', {
       botName: config.botName,
@@ -88,33 +73,27 @@ async function startWebServer() {
       maxSessions: config.maxSessions,
     });
 
-    // Rejoindre la salle d'une session pour recevoir son QR
-    socket.on('join_session', (sessionId) => {
-      socket.join(sessionId);
-      const { getAllSessions } = require('../lib/session-manager');
-      const sessions = getAllSessions();
-      const session = sessions.get(sessionId);
-      if (session?.qr) {
-        socket.emit('qr', { sessionId, qr: session.qr });
+    // User submits phone number → create session with pairing code
+    socket.on('pair_request', async ({ phoneNumber }) => {
+      if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 7) {
+        socket.emit('error', { message: 'Please enter a valid phone number.' });
+        return;
       }
-    });
-
-    // Créer une nouvelle session depuis le web
-    socket.on('create_session', async () => {
+      if (getSessionCount() >= config.maxSessions) {
+        socket.emit('error', { message: `Session limit of ${config.maxSessions} reached.` });
+        return;
+      }
       try {
-        if (getSessionCount() >= config.maxSessions) {
-          socket.emit('error', { message: `Limite de ${config.maxSessions} sessions atteinte.` });
-          return;
-        }
-        const { sessionId } = await createSession(null, io);
-        socket.emit('session_created', { sessionId });
-        socket.join(sessionId);
+        const clean = phoneNumber.replace(/\D/g, '');
+        const { sessionId } = await createSession(null, io, clean);
+        socket.emit('pair_started', { sessionId });
+        console.log(`[PAIR] Started pairing for +${clean} — session ${sessionId}`);
       } catch (err) {
         socket.emit('error', { message: err.message });
       }
     });
 
-    // Supprimer une session depuis le web
+    // Delete session
     socket.on('delete_session', async ({ sessionId }) => {
       try {
         await deleteSession(sessionId);
@@ -125,14 +104,14 @@ async function startWebServer() {
     });
 
     socket.on('disconnect', () => {
-      console.log(`[WEB] Client déconnecté: ${socket.id}`);
+      console.log(`[WEB] Client disconnected: ${socket.id}`);
     });
   });
 
-  // ─── Démarrage ─────────────────────────────────
-
+  // ─── Start ────────────────────────────────────────────────────────────────
   return new Promise((resolve, reject) => {
     server.listen(config.webPort, () => {
+      console.log(`[WEB] Panel running on port ${config.webPort}`);
       resolve({ io, server });
     });
     server.on('error', reject);

@@ -7,23 +7,23 @@ const {
   makeInMemoryStore,
   Browsers,
 } = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const path = require('path');
-const fs = require('fs-extra');
+const pino  = require('pino');
+const path  = require('path');
+const fs    = require('fs-extra');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 
 const logger = pino({ level: 'silent' });
 const sessions = new Map();
-const sessionEvents = new Map();
-
-// Max 60 sessions simultanées
 const MAX_SESSIONS = config.maxSessions || 60;
 
-async function createSession(sessionId = null, io = null) {
+// ─── Create session (pairing-code mode) ───────────────────────────────────────
+// phoneNumber: e.g. "242053323191"  — if provided, requests pairing code
+//              null/undefined       — connection from restored creds (no code needed)
+async function createSession(sessionId = null, io = null, phoneNumber = null) {
   if (!sessionId) sessionId = uuidv4();
   if (sessions.size >= MAX_SESSIONS) {
-    throw new Error(`Limite de ${MAX_SESSIONS} sessions atteinte.`);
+    throw new Error(`Session limit of ${MAX_SESSIONS} reached.`);
   }
   if (sessions.has(sessionId)) {
     return { sessionId, existing: true };
@@ -34,85 +34,94 @@ async function createSession(sessionId = null, io = null) {
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
   const { version } = await fetchLatestBaileysVersion();
-
   const store = makeInMemoryStore({ logger });
 
   const sock = makeWASocket({
     version,
     logger,
-    printQRInTerminal: false,
+    printQRInTerminal: false,    // no QR in terminal
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
     browser: Browsers.ubuntu('Chrome'),
     generateHighQualityLinkPreview: true,
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 30000,
-    keepAliveIntervalMs: 25000,
+    connectTimeoutMs: 60_000,
+    defaultQueryTimeoutMs: 30_000,
+    keepAliveIntervalMs: 25_000,
   });
 
   store.bind(sock.ev);
+  sessions.set(sessionId, { sock, store, status: 'connecting', code: null });
 
-  sessions.set(sessionId, { sock, store, status: 'connecting', qr: null });
+  let pairingCodeRequested = false;
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    if (qr) {
-      const QRCode = require('qrcode');
-      const qrImage = await QRCode.toDataURL(qr);
-      const sessionData = sessions.get(sessionId);
-      if (sessionData) {
-        sessionData.qr = qrImage;
-        sessionData.status = 'qr';
-        sessions.set(sessionId, sessionData);
+    // ── Pairing code: intercept QR event ───────────────────────────────────
+    if (qr && phoneNumber && !pairingCodeRequested) {
+      pairingCodeRequested = true;
+      try {
+        const code = await sock.requestPairingCode(phoneNumber.replace(/\D/g, ''));
+        const formatted = code.match(/.{1,4}/g).join('-'); // e.g. "ABCD-1234"
+        const sessionData = sessions.get(sessionId);
+        if (sessionData) {
+          sessionData.code = formatted;
+          sessionData.status = 'pairing';
+          sessions.set(sessionId, sessionData);
+        }
+        if (io) {
+          io.emit('pairing_code', { sessionId, code: formatted });
+          io.emit('sessions_update', getSessionsInfo());
+        }
+        console.log(`[PAIR] Session ${sessionId} — Code: ${formatted}`);
+      } catch (err) {
+        console.error(`[PAIR ERROR] ${err.message}`);
+        if (io) io.emit('pair_error', { sessionId, message: err.message });
       }
-      if (io) {
-        io.to(sessionId).emit('qr', { sessionId, qr: qrImage });
-        io.emit('sessions_update', getSessionsInfo());
-      }
-      console.log(`[QR] Session ${sessionId} — Scanner le QR code`);
     }
 
+    // ── Disconnected ────────────────────────────────────────────────────────
     if (connection === 'close') {
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      const sessionData = sessions.get(sessionId);
-      if (sessionData) {
-        sessionData.status = 'disconnected';
-        sessions.set(sessionId, sessionData);
-      }
+      console.log(`[SESSION] ${sessionId} disconnected. Reconnect: ${shouldReconnect}`);
+      sessions.delete(sessionId); // remove before recreating
       if (io) io.emit('sessions_update', getSessionsInfo());
-      console.log(`[SESSION] ${sessionId} déconnecté. Reconnexion: ${shouldReconnect}`);
+
       if (shouldReconnect) {
-        // Supprimer l'ancienne entrée pour permettre la recréation
-        sessions.delete(sessionId);
-        setTimeout(() => createSession(sessionId, io), 5000);
-      } else {
-        sessions.delete(sessionId);
-        if (io) io.emit('sessions_update', getSessionsInfo());
+        // Reconnect without requesting a new code (creds still valid)
+        setTimeout(() => createSession(sessionId, io, null), 5000);
       }
     }
 
+    // ── Connected ───────────────────────────────────────────────────────────
     if (connection === 'open') {
       const sessionData = sessions.get(sessionId);
       if (sessionData) {
         sessionData.status = 'connected';
-        sessionData.qr = null;
+        sessionData.code = null;
         sessions.set(sessionId, sessionData);
       }
       if (io) {
-        io.to(sessionId).emit('connected', { sessionId });
+        io.emit('connected', { sessionId });
         io.emit('sessions_update', getSessionsInfo());
       }
-      console.log(`[SESSION] ${sessionId} connecté avec succès ✅`);
+      console.log(`[SESSION] ${sessionId} connected ✅`);
+
+      // Send welcome message to owner on first connection
+      try {
+        const { sendWelcomeMessage } = require('../handler');
+        const ownerJid = config.ownerNumber + '@s.whatsapp.net';
+        await sendWelcomeMessage(sock, ownerJid);
+      } catch (_) {}
     }
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // Attacher le handler de messages
+  // ── Attach message handler ─────────────────────────────────────────────────
   const { handleMessage } = require('../handler');
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
@@ -129,13 +138,15 @@ async function createSession(sessionId = null, io = null) {
   return { sessionId, sock };
 }
 
-function getSession(sessionId) {
-  return sessions.get(sessionId);
+// ─── Request pairing code for an existing session ─────────────────────────────
+// Called from web server when user submits phone number
+async function requestPairing(sessionId, phoneNumber, io) {
+  return createSession(sessionId, io, phoneNumber);
 }
 
-function getAllSessions() {
-  return sessions;
-}
+function getSession(sessionId) { return sessions.get(sessionId); }
+function getAllSessions()       { return sessions; }
+function getSessionCount()     { return sessions.size; }
 
 function getSessionsInfo() {
   const info = [];
@@ -143,7 +154,7 @@ function getSessionsInfo() {
     info.push({
       id,
       status: data.status,
-      hasQr: !!data.qr,
+      code: data.code || null,
       user: data.sock?.user || null,
     });
   }
@@ -153,9 +164,7 @@ function getSessionsInfo() {
 async function deleteSession(sessionId) {
   const session = sessions.get(sessionId);
   if (session) {
-    try {
-      await session.sock.logout();
-    } catch (_) {}
+    try { await session.sock.logout(); } catch (_) {}
     sessions.delete(sessionId);
   }
   const sessionPath = path.join(config.sessionDir, sessionId);
@@ -163,15 +172,34 @@ async function deleteSession(sessionId) {
   return true;
 }
 
-function getSessionCount() {
-  return sessions.size;
+// ─── Restore all saved sessions on startup ────────────────────────────────────
+async function restoreAllSessions(io) {
+  await fs.ensureDir(config.sessionDir);
+  const entries = await fs.readdir(config.sessionDir);
+  const dirs = [];
+  for (const entry of entries) {
+    const full = path.join(config.sessionDir, entry);
+    const stat = await fs.stat(full);
+    if (stat.isDirectory()) dirs.push(entry);
+  }
+  console.log(`[SESSIONS] Restoring ${dirs.length} saved session(s)...`);
+  for (const sessionId of dirs) {
+    try {
+      await createSession(sessionId, io, null); // restore without pairing code
+      console.log(`[RESTORE] Session ${sessionId} restored`);
+    } catch (err) {
+      console.error(`[RESTORE ERROR] ${sessionId}: ${err.message}`);
+    }
+  }
 }
 
 module.exports = {
   createSession,
+  requestPairing,
   getSession,
   getAllSessions,
   getSessionsInfo,
   deleteSession,
   getSessionCount,
+  restoreAllSessions,
 };

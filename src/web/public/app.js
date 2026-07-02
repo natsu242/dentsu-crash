@@ -1,17 +1,19 @@
 // DENTSU CRASH v4.9.0 — Frontend Panel
-const socket = io();
+// Connects to Render backend; falls back to same-origin for local dev
+const BACKEND = 'https://dentsu-crash.onrender.com';
+const socket  = io(BACKEND, { transports: ['websocket', 'polling'] });
 
-// ── State ──────────────────────────────────────
-let currentSessionId = null;
+// ── State ───────────────────────────────────────────────────────────────────
 let sessions = [];
+let codeTimerInterval = null;
 
-// ── Init ───────────────────────────────────────
+// ── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   createParticles();
   setupEventListeners();
 });
 
-// ── Particles ──────────────────────────────────
+// ── Particles ───────────────────────────────────────────────────────────────
 function createParticles() {
   const container = document.getElementById('particles');
   for (let i = 0; i < 40; i++) {
@@ -29,15 +31,15 @@ function createParticles() {
   }
 }
 
-// ── Socket Events ──────────────────────────────
+// ── Socket Events ────────────────────────────────────────────────────────────
 socket.on('connect', () => {
   setStatus('online');
-  showToast('✅ Connecté au serveur', 'success');
+  showToast('✅ Connected to server', 'success');
 });
 
 socket.on('disconnect', () => {
   setStatus('offline');
-  showToast('❌ Déconnecté du serveur', 'error');
+  showToast('❌ Disconnected from server', 'error');
 });
 
 socket.on('bot_info', (info) => {
@@ -50,48 +52,87 @@ socket.on('sessions_update', (data) => {
   updateStats();
 });
 
-socket.on('session_created', ({ sessionId }) => {
-  currentSessionId = sessionId;
-  socket.emit('join_session', sessionId);
-  showQrModal(sessionId);
-  showToast('📱 Session créée — Scanner le QR code', 'success');
+// Pairing started → waiting for code
+socket.on('pair_started', ({ sessionId }) => {
+  showConnectStatus('⏳ Generating code for session ' + sessionId.slice(0, 8) + '...', 'info');
 });
 
-socket.on('qr', ({ sessionId, qr }) => {
-  if (sessionId === currentSessionId || document.getElementById('qr-modal').style.display !== 'none') {
-    displayQr(qr, sessionId);
-  }
+// Pairing code received
+socket.on('pairing_code', ({ sessionId, code }) => {
+  showCode(code);
+  showToast('🔑 Pairing code received!', 'success');
+  startCodeTimer(60);
 });
 
+// Pairing error
+socket.on('pair_error', ({ message }) => {
+  showConnectStatus('❌ ' + message, 'error');
+  showToast('❌ Pairing error: ' + message, 'error');
+  setBtnState(false);
+});
+
+// Session fully connected
 socket.on('connected', ({ sessionId }) => {
-  if (sessionId === currentSessionId) {
-    closeQrModal();
-    showToast('✅ WhatsApp connecté avec succès !', 'success');
-  }
+  hideCode();
+  stopCodeTimer();
+  showConnectStatus('✅ WhatsApp connected successfully!', 'success');
+  showToast('✅ WhatsApp connected!', 'success');
+  setBtnState(false);
+  // Reset form after 3 s
+  setTimeout(() => {
+    document.getElementById('phone-input').value = '';
+    hideConnectStatus();
+  }, 3000);
 });
 
 socket.on('error', ({ message }) => {
-  showToast(`❌ ${message}`, 'error');
+  showToast('❌ ' + message, 'error');
+  showConnectStatus('❌ ' + message, 'error');
+  setBtnState(false);
 });
 
-// ── Event Listeners ────────────────────────────
+// ── Event Listeners ──────────────────────────────────────────────────────────
 function setupEventListeners() {
-  document.getElementById('btn-add-session').addEventListener('click', () => {
-    socket.emit('create_session');
-    showToast('⏳ Création de la session...', 'success');
+  const btn   = document.getElementById('btn-connect');
+  const input = document.getElementById('phone-input');
+
+  btn.addEventListener('click', handleConnect);
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleConnect();
   });
 
-  document.getElementById('modal-close').addEventListener('click', closeQrModal);
-
-  document.getElementById('qr-modal').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeQrModal();
+  // Format phone number as user types
+  input.addEventListener('input', () => {
+    input.value = input.value.replace(/[^0-9+\-\s]/g, '');
   });
 }
 
-// ── Sessions UI ────────────────────────────────
+function handleConnect() {
+  const input = document.getElementById('phone-input');
+  const raw   = input.value.trim();
+  const phone = raw.replace(/\D/g, '');
+
+  if (phone.length < 7) {
+    showConnectStatus('⚠️ Please enter a valid phone number with country code.', 'error');
+    showToast('⚠️ Invalid phone number', 'error');
+    return;
+  }
+
+  setBtnState(true);
+  hideCode();
+  showConnectStatus('⏳ Connecting to WhatsApp server...', 'info');
+  socket.emit('pair_request', { phoneNumber: phone });
+}
+
+// ── Sessions UI ──────────────────────────────────────────────────────────────
 function updateSessionsUI() {
-  const grid = document.getElementById('sessions-grid');
+  const grid       = document.getElementById('sessions-grid');
   const emptyState = document.getElementById('empty-state');
+  const badge      = document.getElementById('sessions-badge');
+
+  const connected = sessions.filter(s => s.status === 'connected').length;
+  badge.textContent = `${connected} connected`;
 
   if (sessions.length === 0) {
     grid.innerHTML = '';
@@ -99,21 +140,15 @@ function updateSessionsUI() {
     return;
   }
 
-  // Remove empty state if present
   if (emptyState) emptyState.remove();
 
-  // Sync cards
   const existingIds = new Set([...grid.querySelectorAll('.session-card')].map(c => c.dataset.id));
-  const currentIds = new Set(sessions.map(s => s.id));
+  const currentIds  = new Set(sessions.map(s => s.id));
 
-  // Remove deleted sessions
   existingIds.forEach(id => {
-    if (!currentIds.has(id)) {
-      grid.querySelector(`[data-id="${id}"]`)?.remove();
-    }
+    if (!currentIds.has(id)) grid.querySelector(`[data-id="${id}"]`)?.remove();
   });
 
-  // Add/update sessions
   sessions.forEach(session => {
     let card = grid.querySelector(`[data-id="${session.id}"]`);
     if (!card) {
@@ -131,8 +166,8 @@ function createEmptyState() {
   div.id = 'empty-state';
   div.innerHTML = `
     <div class="empty-icon">📵</div>
-    <p>Aucune session connectée</p>
-    <p class="empty-sub">Clique sur "Ajouter Session" pour scanner un QR code</p>
+    <p>No sessions connected yet</p>
+    <p class="empty-sub">Enter a phone number above to pair a WhatsApp account</p>
   `;
   return div;
 }
@@ -153,15 +188,19 @@ function updateSessionCard(card, session) {
 }
 
 function buildCardHTML(session) {
-  const statusLabel = {
-    connected: '🟢 Connecté',
-    qr: '🟡 QR à scanner',
-    disconnected: '🔴 Déconnecté',
-    connecting: '🔵 Connexion...',
-  }[session.status] || session.status;
-
-  const user = session.user ? `<div class="session-user">📱 ${session.user.name || session.user.id?.split(':')[0] || 'Connecté'}</div>` : '';
-  const qrBtn = session.hasQr ? `<button class="btn-qr" data-action="qr">📷 QR Code</button>` : '';
+  const labels = {
+    connected:  '🟢 Connected',
+    pairing:    '🟡 Enter code in WhatsApp',
+    disconnected:'🔴 Disconnected',
+    connecting: '🔵 Connecting...',
+  };
+  const statusLabel = labels[session.status] || session.status;
+  const user = session.user
+    ? `<div class="session-user">📱 ${session.user.name || ('+' + session.user.id?.split(':')[0]) || 'Connected'}</div>`
+    : '';
+  const codeHtml = session.code
+    ? `<div class="session-code">🔑 Code: <strong>${session.code}</strong></div>`
+    : '';
 
   return `
     <div class="session-header">
@@ -169,88 +208,112 @@ function buildCardHTML(session) {
         <div class="status-indicator ${session.status}"></div>
         <span>${statusLabel}</span>
       </div>
-      <button class="btn-danger" data-action="delete">✕</button>
+      <button class="btn-danger" data-action="delete" title="Disconnect session">✕</button>
     </div>
-    <div class="session-id">🆔 ${session.id}</div>
+    <div class="session-id">🆔 ${session.id.slice(0, 16)}...</div>
     ${user}
-    <div class="session-actions">
-      ${qrBtn}
-    </div>
+    ${codeHtml}
   `;
 }
 
 function attachCardListeners(card, session) {
   card.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
-    if (confirm(`Supprimer la session ${session.id.slice(0, 8)}... ?`)) {
+    if (confirm(`Disconnect session ${session.id.slice(0, 8)}...?`)) {
       socket.emit('delete_session', { sessionId: session.id });
-      showToast('🗑️ Session supprimée', 'success');
+      showToast('🗑️ Session removed', 'success');
     }
-  });
-
-  card.querySelector('[data-action="qr"]')?.addEventListener('click', () => {
-    currentSessionId = session.id;
-    socket.emit('join_session', session.id);
-    showQrModal(session.id);
   });
 }
 
-// ── Stats ──────────────────────────────────────
+// ── Stats ────────────────────────────────────────────────────────────────────
 function updateStats() {
-  const total = sessions.length;
-  const online = sessions.filter(s => s.status === 'connected').length;
-  const max = 60;
+  const total   = sessions.length;
+  const online  = sessions.filter(s => s.status === 'connected').length;
+  const max     = parseInt(document.getElementById('max-sessions').textContent) || 60;
 
   document.getElementById('session-count').textContent = total;
   document.getElementById('card-sessions').textContent = total;
-  document.getElementById('card-online').textContent = online;
+  document.getElementById('card-online').textContent   = online;
 
-  const pct = Math.min((total / max) * 100, 100);
   const bar = document.getElementById('sessions-bar');
-  if (bar) bar.style.width = `${pct}%`;
+  if (bar) bar.style.width = `${Math.min((total / max) * 100, 100)}%`;
 }
 
-// ── Status ─────────────────────────────────────
+// ── Status dot ───────────────────────────────────────────────────────────────
 function setStatus(state) {
-  const dot = document.getElementById('status-dot');
+  const dot  = document.getElementById('status-dot');
   const text = document.getElementById('status-text');
   if (state === 'online') {
     dot.classList.add('online');
-    text.textContent = 'En ligne';
+    text.textContent = 'Online';
   } else {
     dot.classList.remove('online');
-    text.textContent = 'Hors ligne';
+    text.textContent = 'Offline';
   }
 }
 
-// ── QR Modal ───────────────────────────────────
-function showQrModal(sessionId) {
-  const modal = document.getElementById('qr-modal');
-  const qrContainer = document.getElementById('qr-container');
-  const sessionDisplay = document.getElementById('session-id-display');
-
-  qrContainer.innerHTML = `
-    <div class="qr-loading">
-      <div class="spinner"></div>
-      <p>Génération du QR code...</p>
-    </div>
-  `;
-  sessionDisplay.textContent = `Session: ${sessionId}`;
-  modal.style.display = 'flex';
-  currentSessionId = sessionId;
+// ── Connect button state ──────────────────────────────────────────────────────
+function setBtnState(loading) {
+  const btn = document.getElementById('btn-connect');
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? '<span class="spinner-sm"></span> Connecting...'
+    : '<span class="btn-icon">📲</span> Get Pairing Code';
 }
 
-function closeQrModal() {
-  document.getElementById('qr-modal').style.display = 'none';
-  currentSessionId = null;
+// ── Code display ──────────────────────────────────────────────────────────────
+function showCode(code) {
+  const box = document.getElementById('code-display');
+  const val = document.getElementById('code-value');
+  val.textContent = code;
+  box.style.display = 'block';
+  // Pulse animation
+  val.classList.remove('pulse');
+  void val.offsetWidth; // reflow
+  val.classList.add('pulse');
 }
 
-function displayQr(qrDataUrl, sessionId) {
-  const qrContainer = document.getElementById('qr-container');
-  qrContainer.innerHTML = `<img src="${qrDataUrl}" alt="QR Code WhatsApp" />`;
-  document.getElementById('session-id-display').textContent = `Session: ${sessionId}`;
+function hideCode() {
+  document.getElementById('code-display').style.display = 'none';
 }
 
-// ── Toast ──────────────────────────────────────
+function startCodeTimer(seconds) {
+  stopCodeTimer();
+  let remaining = seconds;
+  const el = document.getElementById('timer-count');
+  if (el) el.textContent = remaining;
+
+  codeTimerInterval = setInterval(() => {
+    remaining--;
+    if (el) el.textContent = remaining;
+    if (remaining <= 0) {
+      stopCodeTimer();
+      const timer = document.getElementById('code-timer');
+      if (timer) timer.textContent = '⚠️ Code may have expired. Try again if not connected.';
+    }
+  }, 1000);
+}
+
+function stopCodeTimer() {
+  if (codeTimerInterval) {
+    clearInterval(codeTimerInterval);
+    codeTimerInterval = null;
+  }
+}
+
+// ── Connect status ───────────────────────────────────────────────────────────
+function showConnectStatus(msg, type) {
+  const el = document.getElementById('connect-status');
+  el.textContent = msg;
+  el.className   = `connect-status connect-status-${type}`;
+  el.style.display = 'block';
+}
+
+function hideConnectStatus() {
+  document.getElementById('connect-status').style.display = 'none';
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
 let toastContainer;
 function showToast(message, type = 'success') {
   if (!toastContainer) {
@@ -262,5 +325,5 @@ function showToast(message, type = 'success') {
   toast.className = `toast ${type}`;
   toast.textContent = message;
   toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 3200);
+  setTimeout(() => toast.remove(), 3500);
 }

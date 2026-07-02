@@ -6,8 +6,13 @@ module.exports = {
   dev: 'Natsu Tech',
   ownerNumber: '242053323191',
   ownerName: 'Natsu Dev',
-  prefix: '!',
-  language: 'fr',
+
+  // ─── Multi-prefix support ─────────────────────
+  // First entry is the default/primary prefix shown in menus
+  prefixes: ['.', '!', '/', '#'],
+  prefix: '.', // kept for backward compat, equals prefixes[0]
+
+  language: 'en',
   maxSessions: 60,
   sessionDir: './sessions',
   webPort: process.env.PORT || 3000,
@@ -22,22 +27,21 @@ module.exports = {
   geminiKey: process.env.GEMINI_API_KEY || '',
   rapidApiKey: process.env.RAPIDAPI_KEY || '',
 
-  // Bot thème ASCII
   banner: `
 ╔══════════════════════════════════════╗
-║   ██████╗ ███████╗███╗   ██╗████████╗   ║
-║   ██╔══██╗██╔════╝████╗  ██║╚══██╔══╝   ║
-║   ██║  ██║█████╗  ██╔██╗ ██║   ██║      ║
-║   ██║  ██║██╔══╝  ██║╚██╗██║   ██║      ║
-║   ██████╔╝███████╗██║ ╚████║   ██║      ║
-║   ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝      ║
-║         ███████╗██╗   ██╗                ║
-║         ██╔════╝██║   ██║                ║
-║         ██║     ██║   ██║                ║
-║         ██║     ██║   ██║                ║
-║         ███████╗╚██████╔╝                ║
-║         ╚══════╝ ╚═════╝                 ║
-║           CRASH  v4.9.0                  ║
-║        by Natsu Tech | 2025             ║
+║  ██████╗ ███████╗███╗   ██╗████████╗ ║
+║  ██╔══██╗██╔════╝████╗  ██║╚══██╔══╝ ║
+║  ██║  ██║█████╗  ██╔██╗ ██║   ██║    ║
+║  ██║  ██║██╔══╝  ██║╚██╗██║   ██║    ║
+║  ██████╔╝███████╗██║ ╚████║   ██║    ║
+║  ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝    ║
+║        ███████╗██╗   ██╗             ║
+║        ██╔════╝██║   ██║             ║
+║        ██║     ██║   ██║             ║
+║        ██║     ██║   ██║             ║
+║        ███████╗╚██████╔╝             ║
+║        ╚══════╝ ╚═════╝              ║
+║          CRASH  v4.9.0               ║
+║       by Natsu Tech | 2025           ║
 ╚══════════════════════════════════════╝`,
 };

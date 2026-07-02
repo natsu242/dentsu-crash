@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Particles background -->
+
   <div class="particles" id="particles"></div>
 
   <!-- Header -->
@@ -19,7 +19,7 @@
         <div class="logo-icon">
           <svg viewBox="0 0 100 100" width="48" height="48">
             <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad1)" stroke-width="3"/>
-            <text x="50" y="62" text-anchor="middle" font-size="40" fill="url(#grad1)">🤖</text>
+            <text x="50" y="62" text-anchor="middle" font-size="38" fill="url(#grad1)">🤖</text>
             <defs>
               <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" style="stop-color:#00ff88"/>
@@ -36,39 +36,39 @@
       <div class="header-stats">
         <div class="stat-chip">
           <span class="stat-dot" id="status-dot"></span>
-          <span id="status-text">Connexion...</span>
+          <span id="status-text">Connecting...</span>
         </div>
         <div class="stat-chip">
-          <span>💬</span>
+          <span>📱</span>
           <span id="session-count">0</span>/<span id="max-sessions">60</span>
         </div>
       </div>
     </div>
   </header>
 
-  <!-- Main -->
   <main class="main">
+
     <!-- Hero -->
     <section class="hero">
       <div class="hero-glow"></div>
       <div class="hero-content">
-        <p class="hero-subtitle">Panneau de contrôle WhatsApp Multi-Sessions</p>
+        <p class="hero-subtitle">WhatsApp Multi-Session Control Panel</p>
         <div class="hero-badges">
-          <span class="badge badge-green">🟢 Multi-Sessions</span>
-          <span class="badge badge-blue">⚡ 60+ Connexions</span>
-          <span class="badge badge-purple">🎮 20+ Commandes</span>
-          <span class="badge badge-orange">🔞 Adult Mode</span>
+          <span class="badge badge-green">🟢 Multi-Session</span>
+          <span class="badge badge-blue">⚡ 60+ Connections</span>
+          <span class="badge badge-purple">🎮 120+ Commands</span>
+          <span class="badge badge-orange">🐛 Bug Menu</span>
         </div>
       </div>
     </section>
 
-    <!-- Stats Cards -->
+    <!-- Stats -->
     <section class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">📱</div>
         <div class="stat-info">
           <span class="stat-value" id="card-sessions">0</span>
-          <span class="stat-label">Sessions actives</span>
+          <span class="stat-label">Active Sessions</span>
         </div>
         <div class="stat-bar"><div class="stat-bar-fill" id="sessions-bar"></div></div>
       </div>
@@ -76,133 +76,103 @@
         <div class="stat-icon">🌐</div>
         <div class="stat-info">
           <span class="stat-value">60</span>
-          <span class="stat-label">Capacité max</span>
+          <span class="stat-label">Max Capacity</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">⚡</div>
         <div class="stat-info">
           <span class="stat-value" id="card-online">0</span>
-          <span class="stat-label">En ligne</span>
+          <span class="stat-label">Online</span>
         </div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">🎯</div>
+        <div class="stat-icon">🔑</div>
         <div class="stat-info">
-          <span class="stat-value">20+</span>
-          <span class="stat-label">Catégories</span>
+          <span class="stat-value">8-digit</span>
+          <span class="stat-label">Pairing Code</span>
         </div>
       </div>
     </section>
 
-    <!-- Sessions Panel -->
-    <section class="panel">
+    <!-- ── CONNECT BOT ──────────────────────────────────────────────────────── -->
+    <section class="panel" id="connect-panel">
       <div class="panel-header">
         <h2 class="panel-title">
-          <span class="panel-icon">📲</span>
-          Sessions WhatsApp
+          <span class="panel-icon">🔗</span>
+          Connect WhatsApp Number
         </h2>
-        <button class="btn-primary" id="btn-add-session">
-          <span>+</span> Ajouter Session
-        </button>
       </div>
 
-      <!-- Add Session Modal trigger zone -->
+      <div class="connect-box">
+        <p class="connect-desc">
+          Enter your WhatsApp phone number with country code to receive an
+          <strong>8-digit pairing code</strong> inside WhatsApp.
+        </p>
+
+        <div class="connect-form">
+          <div class="input-group">
+            <span class="input-prefix">+</span>
+            <input
+              type="tel"
+              id="phone-input"
+              class="phone-input"
+              placeholder="242053323191"
+              maxlength="20"
+              autocomplete="tel"
+            />
+          </div>
+          <button class="btn-connect" id="btn-connect">
+            <span class="btn-icon">📲</span>
+            Get Pairing Code
+          </button>
+        </div>
+
+        <!-- Code display (hidden until received) -->
+        <div class="code-display" id="code-display" style="display:none">
+          <div class="code-label">Your 8-digit pairing code:</div>
+          <div class="code-value" id="code-value">---- ----</div>
+          <div class="code-steps">
+            <div class="code-step">
+              <span class="step-num">1</span>
+              Open WhatsApp on your phone
+            </div>
+            <div class="code-step">
+              <span class="step-num">2</span>
+              Tap <strong>⋮ → Linked Devices → Link a device</strong>
+            </div>
+            <div class="code-step">
+              <span class="step-num">3</span>
+              Tap <strong>"Link with phone number"</strong>
+            </div>
+            <div class="code-step">
+              <span class="step-num">4</span>
+              Enter the 8-digit code above
+            </div>
+          </div>
+          <div class="code-timer" id="code-timer">⏳ Code expires in <span id="timer-count">60</span>s</div>
+        </div>
+
+        <!-- Status message -->
+        <div class="connect-status" id="connect-status" style="display:none"></div>
+      </div>
+    </section>
+
+    <!-- ── ACTIVE SESSIONS ──────────────────────────────────────────────────── -->
+    <section class="panel" id="sessions-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span class="panel-icon">📡</span>
+          Active Sessions
+        </h2>
+        <span class="sessions-badge" id="sessions-badge">0 connected</span>
+      </div>
+
       <div class="sessions-grid" id="sessions-grid">
         <div class="empty-state" id="empty-state">
           <div class="empty-icon">📵</div>
-          <p>Aucune session connectée</p>
-          <p class="empty-sub">Clique sur "Ajouter Session" pour scanner un QR code</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- QR Modal -->
-    <div class="modal-overlay" id="qr-modal" style="display:none">
-      <div class="modal">
-        <div class="modal-header">
-          <h3>📱 Scanner le QR Code</h3>
-          <button class="modal-close" id="modal-close">✕</button>
-        </div>
-        <div class="modal-body">
-          <div class="qr-container" id="qr-container">
-            <div class="qr-loading">
-              <div class="spinner"></div>
-              <p>Génération du QR code...</p>
-            </div>
-          </div>
-          <div class="qr-instructions">
-            <h4>Comment connecter ?</h4>
-            <ol>
-              <li>Ouvre WhatsApp sur ton téléphone</li>
-              <li>Appuie sur les 3 points → <strong>Appareils connectés</strong></li>
-              <li>Clique sur <strong>Connecter un appareil</strong></li>
-              <li>Scanne le QR code ci-dessus</li>
-            </ol>
-          </div>
-          <div class="session-id-display" id="session-id-display"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Menus Info -->
-    <section class="menus-section">
-      <h2 class="section-title">🎮 Menus disponibles</h2>
-      <div class="menus-grid">
-        <div class="menu-card">
-          <div class="menu-icon">👥</div>
-          <h3>GROUPE MENU</h3>
-          <p>Gestion complète des groupes WhatsApp</p>
-          <div class="menu-cmds">tagall, kick, add, promote, mute, link, poll...</div>
-        </div>
-        <div class="menu-card">
-          <div class="menu-icon">👑</div>
-          <h3>OWNER MENU</h3>
-          <p>Contrôle total du bot pour l'owner</p>
-          <div class="menu-cmds">broadcast, block, sessions, eval, restart...</div>
-        </div>
-        <div class="menu-card">
-          <div class="menu-icon">⬇️</div>
-          <h3>DOWNLOAD MENU</h3>
-          <p>Téléchargement depuis toutes les plateformes</p>
-          <div class="menu-cmds">yt, ytmp3, tiktok, ig, spotify, apk...</div>
-        </div>
-        <div class="menu-card">
-          <div class="menu-icon">😂</div>
-          <h3>FUN MENU</h3>
-          <p>Divertissement et jeux sociaux</p>
-          <div class="menu-cmds">sticker, blague, 8ball, ship, verite, meme...</div>
-        </div>
-        <div class="menu-card">
-          <div class="menu-icon">🤖</div>
-          <h3>IA MENU</h3>
-          <p>Intelligence artificielle intégrée</p>
-          <div class="menu-cmds">gpt, gemini, imagine, wiki, weather...</div>
-        </div>
-        <div class="menu-card">
-          <div class="menu-icon">🎌</div>
-          <h3>ANIME MENU</h3>
-          <p>Contenu anime et manga</p>
-          <div class="menu-cmds">anime, manga, waifu, neko, hug, topanime...</div>
-        </div>
-        <div class="menu-card">
-          <div class="menu-icon">🎮</div>
-          <h3>JEUX MENU</h3>
-          <p>Mini-jeux interactifs en groupe</p>
-          <div class="menu-cmds">tictactoe, quiz, casino, rps, blackjack...</div>
-        </div>
-        <div class="menu-card">
-          <div class="menu-icon">🎬</div>
-          <h3>MEDIA MENU</h3>
-          <p>Traitement et conversion de médias</p>
-          <div class="menu-cmds">sticker, toimg, lyrics, radio, gif, filter...</div>
-        </div>
-        <div class="menu-card menu-card-adult">
-          <div class="menu-icon">🔞</div>
-          <h3>ADULT MENU</h3>
-          <p>Contenu réservé aux majeurs</p>
-          <div class="menu-cmds">hentai, nsfw_waifu, trap, ero...</div>
-          <span class="adult-badge">18+</span>
+          <p>No sessions connected yet</p>
+          <p class="empty-sub">Enter a phone number above to pair a WhatsApp account</p>
         </div>
       </div>
     </section>
@@ -210,14 +180,16 @@
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-content">
-        <p>🤖 <strong>DENTSU CRASH v4.9.0</strong> — Développé par <strong>Natsu Tech</strong></p>
+        <p>🤖 <strong>DENTSU CRASH v4.9.0</strong> — Built by <strong>Natsu Tech</strong></p>
         <p>👑 Owner: <a href="https://wa.me/242053323191" target="_blank">+242 053 323 191</a></p>
-        <p>🌐 <a href="https://github.com/natsu242/dentsu-crash" target="_blank">GitHub: natsu242/dentsu-crash</a></p>
+        <p>🌐 <a href="https://github.com/natsu242/dentsu-crash" target="_blank">natsu242/dentsu-crash</a></p>
       </div>
     </footer>
+
   </main>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://dentsu-crash.onrender.com/socket.io/socket.io.js"
+    onerror="this.onerror=null;this.src='/socket.io/socket.io.js'"></script>
   <script src="app.js"></script>
 </body>
 </html>

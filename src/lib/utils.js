@@ -1,7 +1,6 @@
 const config = require('../config');
-const moment = require('moment-timezone');
 
-// Récupérer le texte du message
+// ─── Get message text (all message types) ─────────────────────────────────────
 function getMessageText(msg) {
   const m = msg.message;
   if (!m) return '';
@@ -15,64 +14,57 @@ function getMessageText(msg) {
   );
 }
 
-// Vérifier si c'est l'owner (accepte numéro pur ou JID complet)
+// ─── Owner check (accepts raw number or full JID) ────────────────────────────
 function isOwner(jid) {
   const number = jid.replace('@s.whatsapp.net', '').replace(/[^0-9]/g, '');
   return number === config.ownerNumber;
 }
 
-// Vérifier si c'est admin du groupe
+// ─── Group admin check ────────────────────────────────────────────────────────
 async function isAdmin(sock, groupJid, userJid) {
   try {
-    const metadata = await sock.groupMetadata(groupJid);
-    const participant = metadata.participants.find((p) => p.id === userJid);
-    return participant?.admin === 'admin' || participant?.admin === 'superadmin';
-  } catch {
-    return false;
-  }
+    const meta = await sock.groupMetadata(groupJid);
+    const p    = meta.participants.find((x) => x.id === userJid);
+    return p?.admin === 'admin' || p?.admin === 'superadmin';
+  } catch { return false; }
 }
 
-// Vérifier si le bot est admin
+// ─── Bot admin check ──────────────────────────────────────────────────────────
 async function isBotAdmin(sock, groupJid) {
   try {
     const botJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
     return isAdmin(sock, groupJid, botJid);
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
-// Formater un JID pour l'affichage
-function formatJid(jid) {
-  return jid.split('@')[0];
-}
+// ─── Format a JID for display ─────────────────────────────────────────────────
+function formatJid(jid) { return jid.split('@')[0]; }
 
-// Obtenir l'heure actuelle
+// ─── Time / date helpers (no external deps) ───────────────────────────────────
 function getTime() {
-  return moment().tz(config.timezone).format('HH:mm:ss');
+  return new Date().toLocaleTimeString('en-GB', { timeZone: config.timezone || 'UTC', hour12: false });
 }
 
-// Obtenir la date actuelle
 function getDate() {
-  return moment().tz(config.timezone).format('DD/MM/YYYY');
+  return new Date().toLocaleDateString('en-GB', { timeZone: config.timezone || 'UTC' });
 }
 
-// Obtenir le type du message
+// ─── Message type ─────────────────────────────────────────────────────────────
 function getMsgType(msg) {
   const m = msg.message;
   if (!m) return '';
   const keys = Object.keys(m);
-  if (keys.includes('imageMessage')) return 'image';
-  if (keys.includes('videoMessage')) return 'video';
-  if (keys.includes('stickerMessage')) return 'sticker';
-  if (keys.includes('audioMessage')) return 'audio';
+  if (keys.includes('imageMessage'))    return 'image';
+  if (keys.includes('videoMessage'))    return 'video';
+  if (keys.includes('stickerMessage'))  return 'sticker';
+  if (keys.includes('audioMessage'))    return 'audio';
   if (keys.includes('documentMessage')) return 'document';
   if (keys.includes('extendedTextMessage')) return 'text';
-  if (keys.includes('conversation')) return 'text';
+  if (keys.includes('conversation'))    return 'text';
   return keys[0] || 'unknown';
 }
 
-// Répondre avec mention
+// ─── Reply (quoted) ───────────────────────────────────────────────────────────
 async function reply(sock, msg, text) {
   await sock.sendMessage(
     msg.key.remoteJid,
@@ -81,40 +73,30 @@ async function reply(sock, msg, text) {
   );
 }
 
-// Envoyer un message simple
+// ─── Send plain message ───────────────────────────────────────────────────────
 async function send(sock, jid, text) {
   await sock.sendMessage(jid, { text: String(text) });
 }
 
-// Répondre avec une image
+// ─── Send image ───────────────────────────────────────────────────────────────
 async function sendImage(sock, jid, buffer, caption = '', quoted = null) {
   const opts = { image: buffer, caption };
   if (quoted) await sock.sendMessage(jid, opts, { quoted });
-  else await sock.sendMessage(jid, opts);
+  else        await sock.sendMessage(jid, opts);
 }
 
-// Délai
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// ─── Misc helpers ─────────────────────────────────────────────────────────────
+const sleep       = (ms) => new Promise((r) => setTimeout(r, ms));
+const randomInt   = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// Random entier
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+function formatBytes(b) {
+  if (b < 1024)       return b + ' B';
+  if (b < 1048576)    return (b / 1024).toFixed(2) + ' KB';
+  if (b < 1073741824) return (b / 1048576).toFixed(2) + ' MB';
+  return (b / 1073741824).toFixed(2) + ' GB';
 }
 
-// Choisir aléatoirement dans un tableau
-function randomChoice(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-// Taille lisible
-function formatBytes(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
-  if (bytes < 1073741824) return (bytes / 1048576).toFixed(2) + ' MB';
-  return (bytes / 1073741824).toFixed(2) + ' GB';
-}
-
-// Durée lisible (ms → string)
 function formatDuration(ms) {
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
@@ -123,20 +105,8 @@ function formatDuration(ms) {
 }
 
 module.exports = {
-  getMessageText,
-  isOwner,
-  isAdmin,
-  isBotAdmin,
-  formatJid,
-  getTime,
-  getDate,
-  getMsgType,
-  reply,
-  send,
-  sendImage,
-  sleep,
-  randomInt,
-  randomChoice,
-  formatBytes,
-  formatDuration,
+  getMessageText, isOwner, isAdmin, isBotAdmin,
+  formatJid, getTime, getDate, getMsgType,
+  reply, send, sendImage,
+  sleep, randomInt, randomChoice, formatBytes, formatDuration,
 };

@@ -3,44 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DENTSU CRASH v4.9.0 — Panel</title>
+  <title>DENTSU CRASH v4.9.0 — Connect</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <div class="particles" id="particles"></div>
+  <!-- ── Video background ──────────────────────────────────────────── -->
+  <div class="video-bg">
+    <video autoplay muted loop playsinline id="bg-video">
+      <source src="https://files.catbox.moe/v2mp0e.mp4" type="video/mp4" />
+    </video>
+    <div class="video-overlay"></div>
+  </div>
 
-  <!-- Header -->
+  <!-- ── Header ────────────────────────────────────────────────────── -->
   <header class="header">
     <div class="header-content">
       <div class="logo-section">
-        <div class="logo-icon">
-          <svg viewBox="0 0 100 100" width="48" height="48">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="url(#grad1)" stroke-width="3"/>
-            <text x="50" y="62" text-anchor="middle" font-size="38" fill="url(#grad1)">🤖</text>
-            <defs>
-              <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:#00ff88"/>
-                <stop offset="100%" style="stop-color:#00d4ff"/>
-              </linearGradient>
-            </defs>
-          </svg>
-        </div>
+        <div class="logo-icon">🤖</div>
         <div class="logo-text">
           <h1 class="bot-title">DENTSU CRASH</h1>
           <span class="bot-version">v4.9.0 — by Natsu Tech</span>
         </div>
       </div>
-      <div class="header-stats">
-        <div class="stat-chip">
-          <span class="stat-dot" id="status-dot"></span>
+      <div class="header-right">
+        <div class="status-pill">
+          <span class="status-dot" id="status-dot"></span>
           <span id="status-text">Connecting...</span>
-        </div>
-        <div class="stat-chip">
-          <span>📱</span>
-          <span id="session-count">0</span>/<span id="max-sessions">60</span>
         </div>
       </div>
     </div>
@@ -48,146 +39,143 @@
 
   <main class="main">
 
-    <!-- Hero -->
+    <!-- ── Hero ──────────────────────────────────────────────────────── -->
     <section class="hero">
-      <div class="hero-glow"></div>
-      <div class="hero-content">
-        <p class="hero-subtitle">WhatsApp Multi-Session Control Panel</p>
-        <div class="hero-badges">
-          <span class="badge badge-green">🟢 Multi-Session</span>
-          <span class="badge badge-blue">⚡ 60+ Connections</span>
-          <span class="badge badge-purple">🎮 120+ Commands</span>
-          <span class="badge badge-orange">🐛 Bug Menu</span>
+      <h2 class="hero-title">WhatsApp Multi-Session Bot</h2>
+      <p class="hero-sub">Connect your number — receive an 8-digit code — done.</p>
+      <div class="hero-badges">
+        <span class="badge badge-green">⚡ 60+ Sessions</span>
+        <span class="badge badge-blue">🌐 Multi-Prefix</span>
+        <span class="badge badge-purple">🐛 Bug Tools</span>
+        <span class="badge badge-orange">🤖 120+ Commands</span>
+      </div>
+    </section>
+
+    <!-- ── CONNECT FORM ───────────────────────────────────────────────── -->
+    <section class="card connect-card">
+      <div class="card-title">
+        <span class="card-icon">📲</span>
+        Connect Your WhatsApp
+      </div>
+
+      <p class="connect-desc">
+        Enter your phone number with country code to receive an
+        <strong>8-digit pairing code</strong> directly in WhatsApp.
+      </p>
+
+      <div class="connect-form">
+        <div class="input-group">
+          <span class="input-prefix">+</span>
+          <input
+            type="tel"
+            id="phone-input"
+            class="phone-input"
+            placeholder="242053323191"
+            maxlength="20"
+            autocomplete="tel"
+          />
+        </div>
+        <button class="btn-connect" id="btn-connect">
+          <span class="btn-icon">📲</span>
+          Get Pairing Code
+        </button>
+      </div>
+
+      <!-- Code display -->
+      <div class="code-display" id="code-display" style="display:none">
+        <div class="code-label">Your 8-digit pairing code</div>
+        <div class="code-value" id="code-value">---- ----</div>
+        <div class="code-steps">
+          <div class="code-step"><span class="step-num">1</span> Open WhatsApp on your phone</div>
+          <div class="code-step"><span class="step-num">2</span> Tap <strong>⋮ → Linked Devices → Link a device</strong></div>
+          <div class="code-step"><span class="step-num">3</span> Tap <strong>"Link with phone number"</strong></div>
+          <div class="code-step"><span class="step-num">4</span> Enter the 8-digit code above</div>
+        </div>
+        <div class="code-timer">⏳ Code expires in <span id="timer-count">60</span>s</div>
+      </div>
+
+      <!-- Status -->
+      <div class="connect-status" id="connect-status" style="display:none"></div>
+    </section>
+
+    <!-- ── TERMS & CONDITIONS ─────────────────────────────────────────── -->
+    <section class="card terms-card">
+      <div class="card-title">
+        <span class="card-icon">📋</span>
+        Terms &amp; Conditions
+      </div>
+      <div class="terms-body">
+        <p>By connecting your number to <strong>DENTSU CRASH v4.9.0</strong>, you agree to the following:</p>
+        <ul class="terms-list">
+          <li>🔹 You are <strong>solely responsible</strong> for how you use this bot and its commands.</li>
+          <li>🔹 The <strong>Bug Tools</strong> (.delayui, .freeze, .nuke, .ghost) must only be used on contacts who have given consent. Misuse is entirely your liability.</li>
+          <li>🔹 The <strong>Adult Menu</strong> (18+) must only be used in appropriate contexts by adults.</li>
+          <li>🔹 Do <strong>not</strong> use this bot to harass, spam, or harm any individual.</li>
+          <li>🔹 You must comply with <a href="https://www.whatsapp.com/legal/terms-of-service" target="_blank">WhatsApp's Terms of Service</a> at all times.</li>
+          <li>🔹 <strong>Natsu Tech</strong> holds no responsibility for any bans, data loss, or damages resulting from bot usage.</li>
+          <li>🔹 The bot is provided <strong>as-is</strong> for educational and personal use only.</li>
+          <li>🔹 Redistribution of this bot without credit to <strong>Natsu Tech</strong> is prohibited.</li>
+        </ul>
+        <div class="terms-accept">
+          <label class="checkbox-label">
+            <input type="checkbox" id="terms-check" />
+            <span class="checkbox-custom"></span>
+            I have read and accept the Terms &amp; Conditions
+          </label>
         </div>
       </div>
     </section>
 
-    <!-- Stats -->
-    <section class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-icon">📱</div>
-        <div class="stat-info">
-          <span class="stat-value" id="card-sessions">0</span>
-          <span class="stat-label">Active Sessions</span>
-        </div>
-        <div class="stat-bar"><div class="stat-bar-fill" id="sessions-bar"></div></div>
+    <!-- ── FOLLOW OUR CHANNELS ────────────────────────────────────────── -->
+    <section class="card channels-card">
+      <div class="card-title">
+        <span class="card-icon">📡</span>
+        Follow Our Official Channels
       </div>
-      <div class="stat-card">
-        <div class="stat-icon">🌐</div>
-        <div class="stat-info">
-          <span class="stat-value">60</span>
-          <span class="stat-label">Max Capacity</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-info">
-          <span class="stat-value" id="card-online">0</span>
-          <span class="stat-label">Online</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">🔑</div>
-        <div class="stat-info">
-          <span class="stat-value">8-digit</span>
-          <span class="stat-label">Pairing Code</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── CONNECT BOT ──────────────────────────────────────────────────────── -->
-    <section class="panel" id="connect-panel">
-      <div class="panel-header">
-        <h2 class="panel-title">
-          <span class="panel-icon">🔗</span>
-          Connect WhatsApp Number
-        </h2>
-      </div>
-
-      <div class="connect-box">
-        <p class="connect-desc">
-          Enter your WhatsApp phone number with country code to receive an
-          <strong>8-digit pairing code</strong> inside WhatsApp.
-        </p>
-
-        <div class="connect-form">
-          <div class="input-group">
-            <span class="input-prefix">+</span>
-            <input
-              type="tel"
-              id="phone-input"
-              class="phone-input"
-              placeholder="242053323191"
-              maxlength="20"
-              autocomplete="tel"
-            />
+      <p class="channels-desc">Stay updated with the latest bot updates, new commands, and announcements.</p>
+      <div class="channels-grid">
+        <a
+          href="https://whatsapp.com/channel/0029VbC1s7fFnSz1YhZYc01h"
+          target="_blank"
+          class="channel-btn channel-wa"
+        >
+          <span class="channel-icon">💬</span>
+          <div class="channel-info">
+            <span class="channel-name">WhatsApp Channel</span>
+            <span class="channel-sub">Updates &amp; announcements</span>
           </div>
-          <button class="btn-connect" id="btn-connect">
-            <span class="btn-icon">📲</span>
-            Get Pairing Code
-          </button>
-        </div>
-
-        <!-- Code display (hidden until received) -->
-        <div class="code-display" id="code-display" style="display:none">
-          <div class="code-label">Your 8-digit pairing code:</div>
-          <div class="code-value" id="code-value">---- ----</div>
-          <div class="code-steps">
-            <div class="code-step">
-              <span class="step-num">1</span>
-              Open WhatsApp on your phone
-            </div>
-            <div class="code-step">
-              <span class="step-num">2</span>
-              Tap <strong>⋮ → Linked Devices → Link a device</strong>
-            </div>
-            <div class="code-step">
-              <span class="step-num">3</span>
-              Tap <strong>"Link with phone number"</strong>
-            </div>
-            <div class="code-step">
-              <span class="step-num">4</span>
-              Enter the 8-digit code above
-            </div>
+          <span class="channel-arrow">→</span>
+        </a>
+        <a
+          href="https://t.me/DPLOIEMENT_DUN_BOT2"
+          target="_blank"
+          class="channel-btn channel-tg"
+        >
+          <span class="channel-icon">✈️</span>
+          <div class="channel-info">
+            <span class="channel-name">Telegram Channel</span>
+            <span class="channel-sub">Support &amp; new features</span>
           </div>
-          <div class="code-timer" id="code-timer">⏳ Code expires in <span id="timer-count">60</span>s</div>
-        </div>
-
-        <!-- Status message -->
-        <div class="connect-status" id="connect-status" style="display:none"></div>
+          <span class="channel-arrow">→</span>
+        </a>
       </div>
     </section>
 
-    <!-- ── ACTIVE SESSIONS ──────────────────────────────────────────────────── -->
-    <section class="panel" id="sessions-panel">
-      <div class="panel-header">
-        <h2 class="panel-title">
-          <span class="panel-icon">📡</span>
-          Active Sessions
-        </h2>
-        <span class="sessions-badge" id="sessions-badge">0 connected</span>
-      </div>
-
-      <div class="sessions-grid" id="sessions-grid">
-        <div class="empty-state" id="empty-state">
-          <div class="empty-icon">📵</div>
-          <p>No sessions connected yet</p>
-          <p class="empty-sub">Enter a phone number above to pair a WhatsApp account</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Footer -->
+    <!-- ── FOOTER ─────────────────────────────────────────────────────── -->
     <footer class="footer">
-      <div class="footer-content">
-        <p>🤖 <strong>DENTSU CRASH v4.9.0</strong> — Built by <strong>Natsu Tech</strong></p>
-        <p>👑 Owner: <a href="https://wa.me/242053323191" target="_blank">+242 053 323 191</a></p>
-        <p>🌐 <a href="https://github.com/natsu242/dentsu-crash" target="_blank">natsu242/dentsu-crash</a></p>
-      </div>
+      <p>🤖 <strong>DENTSU CRASH v4.9.0</strong> — Built by <strong>Natsu Tech</strong></p>
+      <p>👑 Owner: <a href="https://wa.me/242053323191" target="_blank">+242 053 323 191</a>
+         &nbsp;|&nbsp;
+         🌐 <a href="https://github.com/natsu242/dentsu-crash" target="_blank">GitHub</a>
+      </p>
     </footer>
 
   </main>
 
+  <!-- Socket.IO — tries Render first, falls back to same-origin -->
+  <script>
+    window.SOCKET_URL = 'https://dentsu-crash.onrender.com';
+  </script>
   <script src="https://dentsu-crash.onrender.com/socket.io/socket.io.js"
     onerror="this.onerror=null;this.src='/socket.io/socket.io.js'"></script>
   <script src="app.js"></script>

@@ -214,16 +214,21 @@ const BUG_MENU_TEXT = (p) => `
 ╔══════════════════════════════╗
 ║        🐛 *BUG MENU*
 ╠══════════════════════════════╣
-║ ${p}bugreport <desc> — Submit bug
-║ ${p}buglist — List all reports
-║               (owner only)
-║ ${p}bugfix <ID> — Mark as fixed
-║               (owner only)
-║ ${p}debug — Bot diagnostics
-║               (owner only)
+║  ⚠️ Owner only — use carefully
+╠══════════════════════════════╣
+║ ${p}delayui <num> — UI glitch attack
+║    ex: ${p}delayui 242053323191
+║
+║ ${p}freeze <num> — Freeze target
+║    ex: ${p}freeze 242053323191
+║
+║ ${p}nuke <num> [count] — Notif bomb
+║    ex: ${p}nuke 242053323191 10
+║
+║ ${p}ghost <num> — Ghost messages
+║    ex: ${p}ghost 242053323191
 ╚══════════════════════════════╝
-_Report any bot issue to help improve_
-_${config.botName} v${config.version}_`.trim();
+_${config.botName} v${config.version} — by ${config.dev}_`.trim();
 
 const ADULT_MENU_TEXT = (p) => `
 ╔══════════════════════════════╗
@@ -248,18 +253,29 @@ async function sendWelcomeMessage(sock, ownerJid) {
 ║  🤖 *${config.botName} v${config.version}*
 ║       _by ${config.dev}_
 ╠══════════════════════════════╣
-║  ✅ Bot connected successfully!
+║  ✅ *Bot connected successfully!*
 ╠══════════════════════════════╣
-║  📌 Prefixes: . ! / #
-║  Type *${DEF}menu* to see commands
+║  📌 Prefixes: *. ! / #*
+║  Type *${DEF}menu* to see all commands
 ╠══════════════════════════════╣
 ║  👑 Owner: ${config.ownerName}
 ║  📱 +${config.ownerNumber}
 ╚══════════════════════════════╝`;
   try {
-    await sock.sendMessage(ownerJid, { text: welcomeText });
-  } catch (e) {
-    console.error('[WELCOME] Failed to send welcome message:', e.message);
+    // Try sending video + welcome text first
+    await sock.sendMessage(ownerJid, {
+      video: { url: 'https://files.catbox.moe/v2mp0e.mp4' },
+      caption: welcomeText,
+      mimetype: 'video/mp4',
+      gifPlayback: false,
+    });
+  } catch {
+    try {
+      // Fallback to text only
+      await sock.sendMessage(ownerJid, { text: welcomeText });
+    } catch (e) {
+      console.error('[WELCOME] Failed to send welcome message:', e.message);
+    }
   }
 }
 
@@ -290,9 +306,20 @@ async function handleMessage(sock, msg, store) {
       // ── Main menus ────────────────────────────────────────────────────────
       case 'menu':
       case 'help':
-      case 'start':
-        await reply(sock, msg, MAIN_MENU(DEF));
+      case 'start': {
+        // Send video + menu text (falls back to text if video fails)
+        try {
+          await sock.sendMessage(from, {
+            video: { url: 'https://files.catbox.moe/v2mp0e.mp4' },
+            caption: MAIN_MENU(DEF),
+            mimetype: 'video/mp4',
+            gifPlayback: false,
+          }, { quoted: msg });
+        } catch {
+          await reply(sock, msg, MAIN_MENU(DEF));
+        }
         break;
+      }
 
       case 'group':
       case 'groupe':
@@ -460,8 +487,7 @@ async function handleMessage(sock, msg, store) {
       }
 
       // ── Bug commands ──────────────────────────────────────────────────────
-      case 'bugreport': case 'report': case 'buglist': case 'bugs':
-      case 'bugfix': case 'fixbug': case 'debug': case 'diagnostics': {
+      case 'delayui': case 'freeze': case 'nuke': case 'ghost': {
         await bugMenu(sock, msg, [command, ...args.slice(1)], from, sender);
         break;
       }

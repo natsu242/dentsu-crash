@@ -5,7 +5,6 @@ const {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   makeInMemoryStore,
-  Browsers,
 } = require('@whiskeysockets/baileys');
 const pino   = require('pino');
 const path   = require('path');
@@ -32,8 +31,11 @@ async function createSession(sessionId = null, io = null, phoneNumber = null) {
   const { version }          = await fetchLatestBaileysVersion();
   const store                = makeInMemoryStore({ logger });
 
-  // ── Clean number: digits only, no + ──────────────────────────────────────
+  // ── Clean number: digits only, no + or spaces ─────────────────────────────
   const cleanNumber = phoneNumber ? phoneNumber.replace(/\D/g, '') : null;
+
+  // ── Determine if we need pairing (fresh, unregistered session) ────────────
+  const needsPairing = !!(cleanNumber && !state.creds.registered);
 
   const sock = makeWASocket({
     version,
@@ -43,36 +45,47 @@ async function createSession(sessionId = null, io = null, phoneNumber = null) {
       creds : state.creds,
       keys  : makeCacheableSignalKeyStore(state.keys, logger),
     },
-    // Browser fingerprint — Mac + Safari avoids some WA blocking patterns
-    browser                  : ['DENTSU CRASH', 'Safari', '3.0'],
+    // Fingerprint — avoids common WA blocking patterns
+    browser                       : ['DENTSU CRASH', 'Safari', '3.0'],
     generateHighQualityLinkPreview: true,
-    connectTimeoutMs         : 60_000,
-    defaultQueryTimeoutMs    : 60_000,
-    keepAliveIntervalMs      : 10_000,   // ping WA every 10 s (prevent drop)
-    syncFullHistory          : false,
-    markOnlineOnConnect      : false,
-    fireInitQueries          : false,
+    connectTimeoutMs              : 60_000,
+    defaultQueryTimeoutMs         : 60_000,
+    keepAliveIntervalMs           : 10_000,
+    syncFullHistory               : false,
+    markOnlineOnConnect           : false,
+    // NOTE: fireInitQueries must remain true (default) so WA servers
+    // properly process the pairing request. Setting it to false breaks pairing.
   });
 
   store.bind(sock.ev);
   sessions.set(sessionId, { sock, store, status: 'connecting', code: null });
 
-  // ── REQUEST PAIRING CODE — immediately, before QR fires ───────────────────
-  // In Baileys 6.x this MUST be called right after socket creation when
-  // the creds are not yet registered. Waiting for the QR event is unreliable.
-  if (cleanNumber && !state.creds.registered) {
-    // Give the WebSocket a moment to open its connection to WA servers
-    setTimeout(async () => {
+  // ── REQUEST PAIRING CODE ───────────────────────────────────────────────────
+  // Must be called IMMEDIATELY after makeWASocket(), before any connection
+  // events fire. Do NOT wait for 'qr' event — by then it's too late.
+  // Do NOT use setTimeout — the WS handshake with WA servers can complete
+  // in < 1s, and a delay means Baileys already committed to QR mode.
+  if (needsPairing) {
+    // We use a small Promise wrapper so we can await the first
+    // 'connection.update' that confirms the WS opened (state = 'open' or 'qr'),
+    // THEN call requestPairingCode before returning the code to the UI.
+    // This is the only timing that reliably works across all network speeds.
+    (async () => {
       try {
+        // Wait until the socket has connected to WA servers enough to accept
+        // the pairing request. We poll sock.ws.readyState (1 = OPEN).
+        await waitForWsOpen(sock);
+
         const raw       = await sock.requestPairingCode(cleanNumber);
-        // Insert dash every 4 chars: "ABCD1234" → "ABCD-1234"
-        const formatted = raw.match(/.{1,4}/g).join('-');
+        const formatted = raw.match(/.{1,4}/g).join('-');   // ABCD-1234
+
         const sessionData = sessions.get(sessionId);
         if (sessionData) {
           sessionData.code   = formatted;
           sessionData.status = 'pairing';
           sessions.set(sessionId, sessionData);
         }
+
         if (io) {
           io.emit('pairing_code',    { sessionId, code: formatted });
           io.emit('sessions_update', getSessionsInfo());
@@ -82,93 +95,117 @@ async function createSession(sessionId = null, io = null, phoneNumber = null) {
         console.error(`[PAIR ERROR] ${err.message}`);
         if (io) io.emit('pair_error', { sessionId, message: `Failed to get pairing code: ${err.message}` });
       }
-    }, 3000); // 3 s — enough for the WS handshake with WA servers
+    })();
   }
 
   // ── Connection events ─────────────────────────────────────────────────────
   sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect } = update;
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr && !needsPairing) {
+      // QR mode (restore without phone number) — just log, don't display
+      console.log(`[QR] Session ${sessionId} — QR generated (restore mode)`);
+    }
 
     if (connection === 'close') {
-      const statusCode    = lastDisconnect?.error?.output?.statusCode;
+      const statusCode      = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log(`[SESSION] ${sessionId} closed. Code=${statusCode} Reconnect=${shouldReconnect}`);
 
-      sessions.delete(sessionId);
-      if (io) io.emit('sessions_update', getSessionsInfo());
+      console.log(`[CONN] Session ${sessionId} closed — code ${statusCode}, reconnect: ${shouldReconnect}`);
 
       if (shouldReconnect) {
-        // Reconnect from saved creds — do NOT request new pairing code
-        console.log(`[SESSION] Reconnecting ${sessionId} in 5 s…`);
-        setTimeout(() => createSession(sessionId, io, null), 5000);
+        const s = sessions.get(sessionId);
+        if (s) s.status = 'reconnecting';
+        await sleep(3000);
+        // Only auto-reconnect for restored sessions (no pairing number)
+        if (!phoneNumber) createSession(sessionId, io, null);
+      } else {
+        sessions.delete(sessionId);
+        if (io) io.emit('sessions_update', getSessionsInfo());
       }
     }
 
     if (connection === 'open') {
-      const sessionData = sessions.get(sessionId);
-      if (sessionData) {
-        sessionData.status = 'connected';
-        sessionData.code   = null;
-        sessions.set(sessionId, sessionData);
+      const s = sessions.get(sessionId);
+      if (s) {
+        s.status = 'connected';
+        s.code   = null;
+        sessions.set(sessionId, s);
       }
-      if (io) {
-        io.emit('connected',       { sessionId });
-        io.emit('sessions_update', getSessionsInfo());
-      }
-      console.log(`[SESSION] ${sessionId} CONNECTED ✅`);
+      console.log(`[CONN] Session ${sessionId} — connected as ${sock.user?.id}`);
+      if (io) io.emit('sessions_update', getSessionsInfo());
 
-      // Send welcome to owner
+      // Send welcome message to owner when a new session comes online
       try {
         const { sendWelcomeMessage } = require('../handler');
-        const ownerJid = config.ownerNumber + '@s.whatsapp.net';
-        await sendWelcomeMessage(sock, ownerJid);
-      } catch (e) {
-        console.error('[WELCOME ERROR]', e.message);
-      }
+        await sendWelcomeMessage(sock, config.ownerNumber);
+      } catch (_) {}
     }
   });
 
+  // ── Credentials persistence ───────────────────────────────────────────────
   sock.ev.on('creds.update', saveCreds);
 
   // ── Messages ──────────────────────────────────────────────────────────────
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
-    for (const msg of messages) {
-      if (!msg.message || msg.key.fromMe) continue;
-      try {
-        const { handleMessage } = require('../handler');
-        await handleMessage(sock, msg);
-      } catch (e) {
-        console.error('[MESSAGE ERROR]', e.message);
+    try {
+      const { handleMessage } = require('../handler');
+      for (const msg of messages) {
+        if (!msg.key.fromMe) await handleMessage(sock, msg);
       }
+    } catch (err) {
+      console.error('[MSG ERROR]', err.message);
     }
   });
 
   return { sessionId };
 }
 
-// ─── Legacy alias ─────────────────────────────────────────────────────────────
-async function requestPairing(sessionId, phoneNumber) {
-  const session = sessions.get(sessionId);
-  if (!session) throw new Error('Session not found.');
-  const clean     = phoneNumber.replace(/\D/g, '');
-  const raw       = await session.sock.requestPairingCode(clean);
-  return raw.match(/.{1,4}/g).join('-');
+// ── Wait until the underlying WebSocket is OPEN ───────────────────────────────
+// Polls every 100 ms; times out after 15 s.
+function waitForWsOpen(sock, timeoutMs = 15_000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      // sock.ws is the raw ws.WebSocket instance in Baileys 6.x
+      const ws = sock.ws;
+      if (ws && ws.readyState === 1 /* OPEN */) return resolve();
+      if (Date.now() - start > timeoutMs) return reject(new Error('WS open timeout'));
+      setTimeout(check, 100);
+    };
+    check();
+  });
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getSession(sessionId) { return sessions.get(sessionId) || null; }
-function getAllSessions()       { return sessions; }
-function getSessionCount()     { return sessions.size; }
+// ── requestPairing: kept for backward compat ──────────────────────────────────
+async function requestPairing(sessionId, phoneNumber, io) {
+  const session = sessions.get(sessionId);
+  if (!session) throw new Error('Session not found');
+  const clean     = phoneNumber.replace(/\D/g, '');
+  const raw       = await session.sock.requestPairingCode(clean);
+  const formatted = raw.match(/.{1,4}/g).join('-');
+  session.code   = formatted;
+  session.status = 'pairing';
+  sessions.set(sessionId, session);
+  if (io) io.emit('pairing_code', { sessionId, code: formatted });
+  return formatted;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function getSession(sessionId)  { return sessions.get(sessionId) || null; }
+function getAllSessions()        { return sessions; }
+function getSessionCount()      { return sessions.size; }
 
 function getSessionsInfo() {
   const info = [];
-  for (const [id, data] of sessions.entries()) {
+  for (const [id, data] of sessions) {
     info.push({
-      id,
-      status : data.status,
-      code   : data.code || null,
-      user   : data.sock?.user || null,
+      sessionId: id,
+      status   : data.status,
+      code     : data.code || null,
+      user     : data.sock?.user || null,
     });
   }
   return info;
@@ -182,6 +219,16 @@ async function deleteSession(sessionId) {
   }
   const sessionPath = path.join(config.sessionDir, sessionId);
   await fs.remove(sessionPath);
+  return true;
+}
+
+// ── Delete ALL sessions + wipe disk ──────────────────────────────────────────
+async function deleteAllSessions() {
+  for (const [id] of sessions) {
+    await deleteSession(id);
+  }
+  // Also wipe any orphan folders
+  await fs.emptyDir(config.sessionDir);
   return true;
 }
 
@@ -213,6 +260,7 @@ module.exports = {
   getAllSessions,
   getSessionsInfo,
   deleteSession,
+  deleteAllSessions,
   getSessionCount,
   restoreAllSessions,
 };

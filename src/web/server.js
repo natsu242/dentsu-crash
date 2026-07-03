@@ -5,7 +5,7 @@ const path   = require('path');
 const config = require('../config');
 const {
   createSession, getSessionsInfo, deleteSession,
-  getSessionCount,
+  deleteAllSessions, getSessionCount,
 } = require('../lib/session-manager');
 
 async function startWebServer() {
@@ -55,6 +55,17 @@ async function startWebServer() {
       await deleteSession(req.params.id);
       io.emit('sessions_update', getSessionsInfo());
       res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE all sessions + wipe corrupted session files
+  app.delete('/api/sessions', async (req, res) => {
+    try {
+      await deleteAllSessions();
+      io.emit('sessions_update', []);
+      res.json({ success: true, message: 'All sessions deleted.' });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

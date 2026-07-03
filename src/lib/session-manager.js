@@ -61,21 +61,13 @@ async function createSession(sessionId = null, io = null, phoneNumber = null) {
   sessions.set(sessionId, { sock, store, status: 'connecting', code: null });
 
   // ── REQUEST PAIRING CODE ───────────────────────────────────────────────────
-  // Must be called IMMEDIATELY after makeWASocket(), before any connection
-  // events fire. Do NOT wait for 'qr' event — by then it's too late.
-  // Do NOT use setTimeout — the WS handshake with WA servers can complete
-  // in < 1s, and a delay means Baileys already committed to QR mode.
+  // Call requestPairingCode() directly after makeWASocket().
+  // Baileys 6.x handles the WS handshake timing internally — no polling or
+  // setTimeout needed. The function is async and resolves once WA servers
+  // confirm the pairing request.
   if (needsPairing) {
-    // We use a small Promise wrapper so we can await the first
-    // 'connection.update' that confirms the WS opened (state = 'open' or 'qr'),
-    // THEN call requestPairingCode before returning the code to the UI.
-    // This is the only timing that reliably works across all network speeds.
     (async () => {
       try {
-        // Wait until the socket has connected to WA servers enough to accept
-        // the pairing request. We poll sock.ws.readyState (1 = OPEN).
-        await waitForWsOpen(sock);
-
         const raw       = await sock.requestPairingCode(cleanNumber);
         const formatted = raw.match(/.{1,4}/g).join('-');   // ABCD-1234
 
@@ -160,22 +152,6 @@ async function createSession(sessionId = null, io = null, phoneNumber = null) {
   });
 
   return { sessionId };
-}
-
-// ── Wait until the underlying WebSocket is OPEN ───────────────────────────────
-// Polls every 100 ms; times out after 15 s.
-function waitForWsOpen(sock, timeoutMs = 15_000) {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const check = () => {
-      // sock.ws is the raw ws.WebSocket instance in Baileys 6.x
-      const ws = sock.ws;
-      if (ws && ws.readyState === 1 /* OPEN */) return resolve();
-      if (Date.now() - start > timeoutMs) return reject(new Error('WS open timeout'));
-      setTimeout(check, 100);
-    };
-    check();
-  });
 }
 
 // ── requestPairing: kept for backward compat ──────────────────────────────────

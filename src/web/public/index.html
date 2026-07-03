@@ -10,169 +10,238 @@
 </head>
 <body>
 
-  <!-- ── Video background ──────────────────────────────────────────── -->
-  <div class="video-bg">
-    <video autoplay muted loop playsinline id="bg-video">
-      <source src="https://files.catbox.moe/v2mp0e.mp4" type="video/mp4" />
-    </video>
-    <div class="video-overlay"></div>
-  </div>
+  <!-- ══════════════════════════════════════════════════════════════════
+       SPLASH / WELCOME SCREEN — covers everything on first load
+  ══════════════════════════════════════════════════════════════════ -->
+  <div id="splash" class="splash">
 
-  <!-- ── Header ────────────────────────────────────────────────────── -->
-  <header class="header">
-    <div class="header-content">
-      <div class="logo-section">
-        <div class="logo-icon">🤖</div>
-        <div class="logo-text">
-          <h1 class="bot-title">DENTSU CRASH</h1>
-          <span class="bot-version">v4.9.0 — by Natsu Tech</span>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="status-pill">
-          <span class="status-dot" id="status-dot"></span>
-          <span id="status-text">Connecting...</span>
-        </div>
-      </div>
+    <!-- Video background inside splash too -->
+    <div class="video-bg">
+      <video autoplay muted loop playsinline>
+        <source src="https://files.catbox.moe/v2mp0e.mp4" type="video/mp4" />
+      </video>
+      <div class="video-overlay splash-overlay"></div>
     </div>
-  </header>
 
-  <main class="main">
+    <div class="splash-inner">
 
-    <!-- ── Hero ──────────────────────────────────────────────────────── -->
-    <section class="hero">
-      <h2 class="hero-title">WhatsApp Multi-Session Bot</h2>
-      <p class="hero-sub">Connect your number — receive an 8-digit code — done.</p>
-      <div class="hero-badges">
-        <span class="badge badge-green">⚡ 60+ Sessions</span>
-        <span class="badge badge-blue">🌐 Multi-Prefix</span>
-        <span class="badge badge-purple">🐛 Bug Tools</span>
-        <span class="badge badge-orange">🤖 120+ Commands</span>
-      </div>
-    </section>
-
-    <!-- ── CONNECT FORM ───────────────────────────────────────────────── -->
-    <section class="card connect-card">
-      <div class="card-title">
-        <span class="card-icon">📲</span>
-        Connect Your WhatsApp
+      <!-- ── Language switcher ── -->
+      <div class="lang-switcher">
+        <button class="lang-btn active" id="lang-en" onclick="setLang('en')">🇬🇧 EN</button>
+        <span class="lang-sep">|</span>
+        <button class="lang-btn" id="lang-fr" onclick="setLang('fr')">🇫🇷 FR</button>
       </div>
 
-      <p class="connect-desc">
-        Enter your phone number with country code to receive an
-        <strong>8-digit pairing code</strong> directly in WhatsApp.
+      <!-- ── Bot branding ── -->
+      <div class="splash-brand">
+        <div class="splash-logo">🤖</div>
+        <h1 class="splash-title">DENTSU CRASH</h1>
+        <span class="splash-version">v4.9.0 — by Natsu Tech</span>
+      </div>
+
+      <!-- ── T&C card ── -->
+      <div class="splash-card">
+        <div class="splash-card-header">
+          <span class="splash-card-icon">📋</span>
+          <span class="splash-card-title" data-en="Terms &amp; Conditions" data-fr="Termes &amp; Conditions">Terms &amp; Conditions</span>
+        </div>
+
+        <div class="splash-terms-scroll">
+
+          <!-- ── English ── -->
+          <div class="tc-block" id="tc-en">
+            <p class="tc-intro">By connecting your number to <strong>DENTSU CRASH v4.9.0</strong>, you accept the following terms:</p>
+            <ul class="tc-list">
+              <li>🔹 You are <strong>solely responsible</strong> for how you use this bot and all its commands.</li>
+              <li>🔹 The <strong>Bug Tools</strong> (.delayui, .freeze, .nuke, .ghost) may only be used with the explicit consent of the target. Misuse is entirely your liability.</li>
+              <li>🔹 The <strong>Adult Menu</strong> (18+) must only be accessed by adults in appropriate contexts.</li>
+              <li>🔹 Do <strong>not</strong> use this bot to harass, spam, or harm any individual or group.</li>
+              <li>🔹 You must comply with <a href="https://www.whatsapp.com/legal/terms-of-service" target="_blank">WhatsApp's Terms of Service</a> at all times.</li>
+              <li>🔹 <strong>Natsu Tech</strong> holds no responsibility for bans, data loss, or any damages resulting from the use of this bot.</li>
+              <li>🔹 This bot is provided <strong>as-is</strong> for educational and personal use only.</li>
+              <li>🔹 Redistribution of this bot without crediting <strong>Natsu Tech</strong> is strictly prohibited.</li>
+              <li>🔹 By clicking <em>Accept</em>, you confirm that you are <strong>at least 13 years old</strong> and understand the above conditions.</li>
+            </ul>
+          </div>
+
+          <!-- ── French ── -->
+          <div class="tc-block" id="tc-fr" style="display:none">
+            <p class="tc-intro">En connectant votre numéro à <strong>DENTSU CRASH v4.9.0</strong>, vous acceptez les conditions suivantes :</p>
+            <ul class="tc-list">
+              <li>🔹 Vous êtes <strong>seul responsable</strong> de l'utilisation de ce bot et de toutes ses commandes.</li>
+              <li>🔹 Les <strong>Bug Tools</strong> (.delayui, .freeze, .nuke, .ghost) ne peuvent être utilisés qu'avec le consentement explicite de la cible. Tout abus est entièrement de votre responsabilité.</li>
+              <li>🔹 Le <strong>Menu Adulte</strong> (18+) est réservé aux adultes dans des contextes appropriés.</li>
+              <li>🔹 N'utilisez <strong>pas</strong> ce bot pour harceler, spammer ou nuire à une personne ou un groupe.</li>
+              <li>🔹 Vous devez respecter les <a href="https://www.whatsapp.com/legal/terms-of-service" target="_blank">Conditions d'utilisation de WhatsApp</a> à tout moment.</li>
+              <li>🔹 <strong>Natsu Tech</strong> n'est pas responsable des bannissements, pertes de données ou dommages résultant de l'utilisation de ce bot.</li>
+              <li>🔹 Ce bot est fourni <strong>tel quel</strong>, à des fins éducatives et personnelles uniquement.</li>
+              <li>🔹 La redistribution de ce bot sans créditer <strong>Natsu Tech</strong> est strictement interdite.</li>
+              <li>🔹 En cliquant sur <em>Accepter</em>, vous confirmez avoir <strong>au moins 13 ans</strong> et comprendre les conditions ci-dessus.</li>
+            </ul>
+          </div>
+
+        </div><!-- /splash-terms-scroll -->
+
+        <!-- Refused message (hidden by default) -->
+        <div class="splash-refused" id="splash-refused" style="display:none">
+          <div class="refused-icon">🚫</div>
+          <p class="refused-msg" data-en="You have refused the Terms &amp; Conditions. Access to DENTSU CRASH is not available." data-fr="Vous avez refusé les Termes &amp; Conditions. L'accès à DENTSU CRASH n'est pas disponible.">
+            You have refused the Terms &amp; Conditions. Access to DENTSU CRASH is not available.
+          </p>
+          <button class="btn-back" onclick="showTermsAgain()">
+            <span data-en="← Go Back" data-fr="← Retour">← Go Back</span>
+          </button>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="splash-actions" id="splash-actions">
+          <button class="btn-refuse" id="btn-refuse" onclick="handleRefuse()">
+            <span class="btn-action-icon">❌</span>
+            <span data-en="Refuse" data-fr="Refuser">Refuse</span>
+          </button>
+          <button class="btn-accept" id="btn-accept" onclick="handleAccept()">
+            <span class="btn-action-icon">✅</span>
+            <span data-en="Accept" data-fr="Accepter">Accept</span>
+          </button>
+        </div>
+
+      </div><!-- /splash-card -->
+
+      <p class="splash-footer-note" data-en="DENTSU CRASH v4.9.0 — Natsu Tech © 2024–2025" data-fr="DENTSU CRASH v4.9.0 — Natsu Tech © 2024–2025">
+        DENTSU CRASH v4.9.0 — Natsu Tech © 2024–2025
       </p>
 
-      <div class="connect-form">
-        <div class="input-group">
-          <span class="input-prefix">+</span>
-          <input
-            type="tel"
-            id="phone-input"
-            class="phone-input"
-            placeholder="242053323191"
-            maxlength="20"
-            autocomplete="tel"
-          />
-        </div>
-        <button class="btn-connect" id="btn-connect">
-          <span class="btn-icon">📲</span>
-          Get Pairing Code
-        </button>
-      </div>
+    </div><!-- /splash-inner -->
+  </div><!-- /splash -->
 
-      <!-- Code display -->
-      <div class="code-display" id="code-display" style="display:none">
-        <div class="code-label">Your 8-digit pairing code</div>
-        <div class="code-value" id="code-value">---- ----</div>
-        <div class="code-steps">
-          <div class="code-step"><span class="step-num">1</span> Open WhatsApp on your phone</div>
-          <div class="code-step"><span class="step-num">2</span> Tap <strong>⋮ → Linked Devices → Link a device</strong></div>
-          <div class="code-step"><span class="step-num">3</span> Tap <strong>"Link with phone number"</strong></div>
-          <div class="code-step"><span class="step-num">4</span> Enter the 8-digit code above</div>
-        </div>
-        <div class="code-timer" id="code-timer">⏳ Code expires in <span id="timer-count">60</span>s</div>
-      </div>
 
-      <!-- Status -->
-      <div class="connect-status" id="connect-status" style="display:none"></div>
-    </section>
+  <!-- ══════════════════════════════════════════════════════════════════
+       MAIN APP — hidden until T&C accepted
+  ══════════════════════════════════════════════════════════════════ -->
+  <div id="app" class="app-hidden">
 
-    <!-- ── TERMS & CONDITIONS ─────────────────────────────────────────── -->
-    <section class="card terms-card">
-      <div class="card-title">
-        <span class="card-icon">📋</span>
-        Terms &amp; Conditions
-      </div>
-      <div class="terms-body">
-        <p>By connecting your number to <strong>DENTSU CRASH v4.9.0</strong>, you agree to the following:</p>
-        <ul class="terms-list">
-          <li>🔹 You are <strong>solely responsible</strong> for how you use this bot and its commands.</li>
-          <li>🔹 The <strong>Bug Tools</strong> (.delayui, .freeze, .nuke, .ghost) must only be used on contacts who have given consent. Misuse is entirely your liability.</li>
-          <li>🔹 The <strong>Adult Menu</strong> (18+) must only be used in appropriate contexts by adults.</li>
-          <li>🔹 Do <strong>not</strong> use this bot to harass, spam, or harm any individual.</li>
-          <li>🔹 You must comply with <a href="https://www.whatsapp.com/legal/terms-of-service" target="_blank">WhatsApp's Terms of Service</a> at all times.</li>
-          <li>🔹 <strong>Natsu Tech</strong> holds no responsibility for any bans, data loss, or damages resulting from bot usage.</li>
-          <li>🔹 The bot is provided <strong>as-is</strong> for educational and personal use only.</li>
-          <li>🔹 Redistribution of this bot without credit to <strong>Natsu Tech</strong> is prohibited.</li>
-        </ul>
-        <div class="terms-accept">
-          <label class="checkbox-label">
-            <input type="checkbox" id="terms-check" />
-            <span class="checkbox-custom"></span>
-            I have read and accept the Terms &amp; Conditions
-          </label>
-        </div>
-      </div>
-    </section>
+    <!-- ── Video background ── -->
+    <div class="video-bg">
+      <video autoplay muted loop playsinline id="bg-video">
+        <source src="https://files.catbox.moe/v2mp0e.mp4" type="video/mp4" />
+      </video>
+      <div class="video-overlay"></div>
+    </div>
 
-    <!-- ── FOLLOW OUR CHANNELS ────────────────────────────────────────── -->
-    <section class="card channels-card">
-      <div class="card-title">
-        <span class="card-icon">📡</span>
-        Follow Our Official Channels
-      </div>
-      <p class="channels-desc">Stay updated with the latest bot updates, new commands, and announcements.</p>
-      <div class="channels-grid">
-        <a
-          href="https://whatsapp.com/channel/0029VbC1s7fFnSz1YhZYc01h"
-          target="_blank"
-          class="channel-btn channel-wa"
-        >
-          <span class="channel-icon">💬</span>
-          <div class="channel-info">
-            <span class="channel-name">WhatsApp Channel</span>
-            <span class="channel-sub">Updates &amp; announcements</span>
+    <!-- ── Header ── -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo-section">
+          <div class="logo-icon">🤖</div>
+          <div class="logo-text">
+            <h1 class="bot-title">DENTSU CRASH</h1>
+            <span class="bot-version">v4.9.0 — by Natsu Tech</span>
           </div>
-          <span class="channel-arrow">→</span>
-        </a>
-        <a
-          href="https://t.me/DPLOIEMENT_DUN_BOT2"
-          target="_blank"
-          class="channel-btn channel-tg"
-        >
-          <span class="channel-icon">✈️</span>
-          <div class="channel-info">
-            <span class="channel-name">Telegram Channel</span>
-            <span class="channel-sub">Support &amp; new features</span>
+        </div>
+        <div class="header-right">
+          <div class="status-pill">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">Connecting...</span>
           </div>
-          <span class="channel-arrow">→</span>
-        </a>
+        </div>
       </div>
-    </section>
+    </header>
 
-    <!-- ── FOOTER ─────────────────────────────────────────────────────── -->
-    <footer class="footer">
-      <p>🤖 <strong>DENTSU CRASH v4.9.0</strong> — Built by <strong>Natsu Tech</strong></p>
-      <p>👑 Owner: <a href="https://wa.me/242053323191" target="_blank">+242 053 323 191</a>
-         &nbsp;|&nbsp;
-         🌐 <a href="https://github.com/natsu242/dentsu-crash" target="_blank">GitHub</a>
-      </p>
-    </footer>
+    <main class="main">
 
-  </main>
+      <!-- ── Hero ── -->
+      <section class="hero">
+        <h2 class="hero-title">WhatsApp Multi-Session Bot</h2>
+        <p class="hero-sub">Connect your number — receive an 8-digit code — done.</p>
+        <div class="hero-badges">
+          <span class="badge badge-green">⚡ 60+ Sessions</span>
+          <span class="badge badge-blue">🌐 Multi-Prefix</span>
+          <span class="badge badge-purple">🐛 Bug Tools</span>
+          <span class="badge badge-orange">🤖 120+ Commands</span>
+        </div>
+      </section>
 
-  <!-- Socket.IO — tries Render first, falls back to same-origin -->
+      <!-- ── Connect form ── -->
+      <section class="card connect-card">
+        <div class="card-title">
+          <span class="card-icon">📲</span>
+          Connect Your WhatsApp
+        </div>
+        <p class="connect-desc">
+          Enter your phone number with country code to receive an
+          <strong>8-digit pairing code</strong> directly in WhatsApp.
+        </p>
+        <div class="connect-form">
+          <div class="input-group">
+            <span class="input-prefix">+</span>
+            <input
+              type="tel"
+              id="phone-input"
+              class="phone-input"
+              placeholder="242053323191"
+              maxlength="20"
+              autocomplete="tel"
+            />
+          </div>
+          <button class="btn-connect" id="btn-connect">
+            <span class="btn-icon">📲</span>
+            Get Pairing Code
+          </button>
+        </div>
+
+        <!-- Code display -->
+        <div class="code-display" id="code-display" style="display:none">
+          <div class="code-label">Your 8-digit pairing code</div>
+          <div class="code-value" id="code-value">---- ----</div>
+          <div class="code-steps">
+            <div class="code-step"><span class="step-num">1</span> Open WhatsApp on your phone</div>
+            <div class="code-step"><span class="step-num">2</span> Tap <strong>⋮ → Linked Devices → Link a device</strong></div>
+            <div class="code-step"><span class="step-num">3</span> Tap <strong>"Link with phone number"</strong></div>
+            <div class="code-step"><span class="step-num">4</span> Enter the 8-digit code above</div>
+          </div>
+          <div class="code-timer" id="code-timer">⏳ Code expires in <span id="timer-count">60</span>s</div>
+        </div>
+
+        <div class="connect-status" id="connect-status" style="display:none"></div>
+      </section>
+
+      <!-- ── Follow channels ── -->
+      <section class="card channels-card">
+        <div class="card-title">
+          <span class="card-icon">📡</span>
+          Follow Our Official Channels
+        </div>
+        <p class="channels-desc">Stay updated with the latest bot updates, new commands, and announcements.</p>
+        <div class="channels-grid">
+          <a href="https://whatsapp.com/channel/0029VbC1s7fFnSz1YhZYc01h" target="_blank" class="channel-btn channel-wa">
+            <span class="channel-icon">💬</span>
+            <div class="channel-info">
+              <span class="channel-name">WhatsApp Channel</span>
+              <span class="channel-sub">Updates &amp; announcements</span>
+            </div>
+            <span class="channel-arrow">→</span>
+          </a>
+          <a href="https://t.me/DPLOIEMENT_DUN_BOT2" target="_blank" class="channel-btn channel-tg">
+            <span class="channel-icon">✈️</span>
+            <div class="channel-info">
+              <span class="channel-name">Telegram Channel</span>
+              <span class="channel-sub">Support &amp; new features</span>
+            </div>
+            <span class="channel-arrow">→</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- ── Footer (no GitHub) ── -->
+      <footer class="footer">
+        <p>🤖 <strong>DENTSU CRASH v4.9.0</strong> — Built by <strong>Natsu Tech</strong></p>
+        <p>👑 Owner: <a href="https://wa.me/242053323191" target="_blank">+242 053 323 191</a></p>
+      </footer>
+
+    </main>
+  </div><!-- /app -->
+
+  <!-- Socket.IO -->
   <script>
     window.SOCKET_URL = 'https://dentsu-crash.onrender.com';
   </script>

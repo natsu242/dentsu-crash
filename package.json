@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.5",
+    "gifted-baileys": "2.5.8",
     "axios": "^1.6.8",
     "cheerio": "^1.0.0-rc.12",
     "dotenv": "^16.4.5",

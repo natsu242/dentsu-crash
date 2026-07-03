@@ -18,6 +18,10 @@ async function startWebServer() {
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
 
+  // ─── Health check — prevents Render free tier from sleeping ──────────────
+  app.get('/healthz', (_, res) => res.status(200).json({ status: 'ok', sessions: getSessionCount() }));
+  app.get('/ping',    (_, res) => res.send('pong'));
+
   // ─── REST API ─────────────────────────────────────────────────────────────
 
   app.get('/api/info', (_, res) => res.json({

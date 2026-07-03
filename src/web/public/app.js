@@ -7,6 +7,13 @@ let   socket  = null;
 let   codeTimerInterval = null;
 let   currentLang = 'en';
 
+// Expose splash handlers globally so inline onclick works even if this script
+// is ever wrapped in a module or bundled in the future.
+window.setLang       = (...a) => setLang(...a);
+window.handleAccept  = () => handleAccept();
+window.handleRefuse  = () => handleRefuse();
+window.showTermsAgain = () => showTermsAgain();
+
 // ════════════════════════════════════════════════════════════════════
 //  SPLASH — Language & T&C logic
 // ════════════════════════════════════════════════════════════════════

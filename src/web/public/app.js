@@ -7,72 +7,98 @@ let   socket  = null;
 let   codeTimerInterval = null;
 let   currentLang = 'en';
 
-// Expose splash handlers globally so inline onclick works even if this script
-// is ever wrapped in a module or bundled in the future.
-window.setLang       = (...a) => setLang(...a);
-window.handleAccept  = () => handleAccept();
-window.handleRefuse  = () => handleRefuse();
-window.showTermsAgain = () => showTermsAgain();
+// Expose splash handlers globally (inline onclick compatibility)
+window.setLang        = setLang;
+window.handleAccept   = handleAccept;
+window.handleRefuse   = handleRefuse;
+window.showTermsAgain = showTermsAgain;
 
 // ════════════════════════════════════════════════════════════════════
 //  SPLASH — Language & T&C logic
 // ════════════════════════════════════════════════════════════════════
 
-/** Switch language on the splash screen */
 function setLang(lang) {
   currentLang = lang;
 
-  // Toggle active button
-  document.getElementById('lang-en').classList.toggle('active', lang === 'en');
-  document.getElementById('lang-fr').classList.toggle('active', lang === 'fr');
+  var btnEn = document.getElementById('lang-en');
+  var btnFr = document.getElementById('lang-fr');
+  if (btnEn) btnEn.className = 'lang-btn' + (lang === 'en' ? ' active' : '');
+  if (btnFr) btnFr.className = 'lang-btn' + (lang === 'fr' ? ' active' : '');
 
-  // Show/hide T&C blocks
-  const en = document.getElementById('tc-en');
-  const fr = document.getElementById('tc-fr');
-  if (en) en.style.display = lang === 'en' ? 'block' : 'none';
-  if (fr) fr.style.display = lang === 'fr' ? 'block' : 'none';
+  var tcEn = document.getElementById('tc-en');
+  var tcFr = document.getElementById('tc-fr');
+  if (tcEn) tcEn.style.display = lang === 'en' ? 'block' : 'none';
+  if (tcFr) tcFr.style.display = lang === 'fr' ? 'block' : 'none';
 
-  // Translate all [data-en] / [data-fr] elements
-  document.querySelectorAll('[data-en]').forEach(el => {
-    el.innerHTML = lang === 'fr' ? el.dataset.fr : el.dataset.en;
-  });
+  // Update all bilingual [data-en] / [data-fr] elements
+  var els = document.querySelectorAll('[data-en]');
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i];
+    el.innerHTML = lang === 'fr' ? (el.getAttribute('data-fr') || '') : (el.getAttribute('data-en') || '');
+  }
 }
 
-/** User clicked Refuse */
 function handleRefuse() {
-  document.getElementById('splash-actions').style.display = 'none';
-  document.querySelector('.splash-terms-scroll').style.display = 'none';
-  document.getElementById('splash-refused').style.display = 'block';
-  // Apply language to refused message
-  const msg = document.querySelector('.refused-msg');
+  var actions = document.getElementById('splash-actions');
+  var scroll  = document.querySelector('.splash-terms-scroll');
+  var refused = document.getElementById('splash-refused');
+  if (actions) actions.style.display = 'none';
+  if (scroll)  scroll.style.display  = 'none';
+  if (refused) refused.style.display = 'block';
+
+  var msg = document.querySelector('.refused-msg');
   if (msg) msg.innerHTML = currentLang === 'fr'
     ? "Vous avez refusé les Termes &amp; Conditions. L'accès à <strong>DENTSU CRASH</strong> n'est pas disponible."
     : "You have refused the Terms &amp; Conditions. Access to <strong>DENTSU CRASH</strong> is not available.";
-  // Apply language to back button
-  const back = document.querySelector('.btn-back span');
+
+  var back = document.querySelector('.btn-back span');
   if (back) back.textContent = currentLang === 'fr' ? '← Retour' : '← Go Back';
 }
 
-/** User clicked Go Back from refused screen */
 function showTermsAgain() {
-  document.getElementById('splash-refused').style.display = 'none';
-  document.querySelector('.splash-terms-scroll').style.display = 'block';
-  document.getElementById('splash-actions').style.display = 'flex';
+  var refused = document.getElementById('splash-refused');
+  var scroll  = document.querySelector('.splash-terms-scroll');
+  var actions = document.getElementById('splash-actions');
+  if (refused) refused.style.display = 'none';
+  if (scroll)  scroll.style.display  = 'block';
+  if (actions) actions.style.display = 'flex';
 }
 
-/** User clicked Accept */
 function handleAccept() {
-  const splash = document.getElementById('splash');
-  const app    = document.getElementById('app');
+  var splash = document.getElementById('splash');
+  var app    = document.getElementById('app');
 
-  // Animate splash out
-  splash.classList.add('hiding');
-  setTimeout(() => {
-    splash.classList.add('gone');
-    app.className = 'app-visible';
-    initSocket();
+  if (!splash || !app) {
+    // Fallback: just show the app directly
+    if (app) { app.style.display = 'block'; }
+    return;
+  }
+
+  // Step 1 — fade out the splash with inline styles (no CSS class dependency)
+  splash.style.transition  = 'opacity 0.45s ease, transform 0.45s ease';
+  splash.style.opacity     = '0';
+  splash.style.transform   = 'scale(1.04)';
+  splash.style.pointerEvents = 'none';
+
+  // Step 2 — after animation, hide splash and reveal app
+  setTimeout(function () {
+    // Hide splash completely
+    splash.style.display = 'none';
+
+    // Show main app
+    app.style.display    = 'block';
+    app.style.opacity    = '0';
+    app.style.transition = 'opacity 0.4s ease';
+    // Force reflow so transition fires
+    void app.offsetHeight;
+    app.style.opacity = '1';
+
+    // Start socket (wrapped in try-catch — never blocks UI)
+    try { initSocket(); } catch (e) { console.warn('[Socket] init failed:', e.message); }
+
+    // Start video loop
     ensureVideoLoop();
-  }, 520);
+  }, 460);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -80,77 +106,90 @@ function handleAccept() {
 // ════════════════════════════════════════════════════════════════════
 
 function initSocket() {
+  if (typeof io === 'undefined') {
+    console.warn('[Socket] socket.io not loaded yet — retrying in 3s');
+    setTimeout(function () {
+      if (typeof io !== 'undefined') initSocket();
+    }, 3000);
+    return;
+  }
+
   socket = io(BACKEND, { transports: ['websocket', 'polling'] });
 
-  socket.on('connect', () => {
+  socket.on('connect', function () {
     setStatus('online');
     showToast('✅ Connected to server', 'success');
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', function () {
     setStatus('offline');
     showToast('❌ Disconnected from server', 'error');
   });
 
-  socket.on('pair_started', () => {
+  socket.on('pair_started', function () {
     showConnectStatus('⏳ Connecting to WhatsApp... waiting for code.', 'info');
   });
 
-  socket.on('pairing_code', ({ code }) => {
-    showCode(code);
+  socket.on('pairing_code', function (data) {
+    showCode(data.code);
     showToast('🔑 Pairing code received!', 'success');
     startCodeTimer(60);
   });
 
-  socket.on('pair_error', ({ message }) => {
-    showConnectStatus('❌ ' + message, 'error');
-    showToast('❌ ' + message, 'error');
+  socket.on('pair_error', function (data) {
+    showConnectStatus('❌ ' + data.message, 'error');
+    showToast('❌ ' + data.message, 'error');
     setBtnState(false);
   });
 
-  socket.on('connected', () => {
+  socket.on('connected', function () {
     hideCode();
     stopCodeTimer();
     showConnectStatus('✅ WhatsApp connected! Check your phone for the welcome message.', 'success');
     showToast('✅ WhatsApp connected!', 'success');
     setBtnState(false);
-    setTimeout(() => {
-      document.getElementById('phone-input').value = '';
+    setTimeout(function () {
+      var inp = document.getElementById('phone-input');
+      if (inp) inp.value = '';
       hideConnectStatus();
     }, 5000);
   });
 
-  socket.on('error', ({ message }) => {
-    showToast('❌ ' + message, 'error');
-    showConnectStatus('❌ ' + message, 'error');
+  socket.on('error', function (data) {
+    showToast('❌ ' + data.message, 'error');
+    showConnectStatus('❌ ' + data.message, 'error');
     setBtnState(false);
   });
 }
 
 function ensureVideoLoop() {
-  const vid = document.getElementById('bg-video');
+  var vid = document.getElementById('bg-video');
   if (!vid) return;
-  vid.addEventListener('ended', () => { vid.currentTime = 0; vid.play(); });
-  vid.play().catch(() => {
-    document.addEventListener('click', () => vid.play(), { once: true });
+  vid.addEventListener('ended', function () { vid.currentTime = 0; vid.play(); });
+  vid.play().catch(function () {
+    document.addEventListener('click', function () { vid.play(); }, { once: true });
   });
 }
 
 // ── Event listeners ──────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const btn   = document.getElementById('btn-connect');
-  const input = document.getElementById('phone-input');
+document.addEventListener('DOMContentLoaded', function () {
+  var btn   = document.getElementById('btn-connect');
+  var input = document.getElementById('phone-input');
+
   if (btn)   btn.addEventListener('click', handleConnect);
   if (input) {
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') handleConnect(); });
-    input.addEventListener('input',   () => { input.value = input.value.replace(/[^0-9]/g, ''); });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') handleConnect(); });
+    input.addEventListener('input',   function ()  { input.value = input.value.replace(/[^0-9]/g, ''); });
   }
 });
 
 function handleConnect() {
-  if (!socket) return;
-  const input = document.getElementById('phone-input');
-  const phone = input.value.replace(/\D/g, '').trim();
+  if (!socket) {
+    showConnectStatus('⚠️ Server not connected yet. Please wait...', 'error');
+    return;
+  }
+  var input = document.getElementById('phone-input');
+  var phone = input.value.replace(/\D/g, '').trim();
   if (phone.length < 7) {
     showConnectStatus('⚠️ Please enter a valid phone number with country code.', 'error');
     return;
@@ -163,15 +202,15 @@ function handleConnect() {
 
 // ── Status dot ───────────────────────────────────────────────────────────────
 function setStatus(state) {
-  const dot  = document.getElementById('status-dot');
-  const text = document.getElementById('status-text');
-  if (dot)  dot.classList.toggle('online', state === 'online');
+  var dot  = document.getElementById('status-dot');
+  var text = document.getElementById('status-text');
+  if (dot)  dot.className = 'status-dot' + (state === 'online' ? ' online' : '');
   if (text) text.textContent = state === 'online' ? 'Online' : 'Offline';
 }
 
 // ── Button state ─────────────────────────────────────────────────────────────
 function setBtnState(loading) {
-  const btn = document.getElementById('btn-connect');
+  var btn = document.getElementById('btn-connect');
   if (!btn) return;
   btn.disabled  = loading;
   btn.innerHTML = loading
@@ -181,8 +220,8 @@ function setBtnState(loading) {
 
 // ── Code display ──────────────────────────────────────────────────────────────
 function showCode(code) {
-  const box = document.getElementById('code-display');
-  const val = document.getElementById('code-value');
+  var box = document.getElementById('code-display');
+  var val = document.getElementById('code-value');
   if (!box || !val) return;
   val.textContent = code;
   box.style.display = 'block';
@@ -191,21 +230,21 @@ function showCode(code) {
   val.classList.add('pulse');
 }
 function hideCode() {
-  const box = document.getElementById('code-display');
+  var box = document.getElementById('code-display');
   if (box) box.style.display = 'none';
 }
 
 function startCodeTimer(sec) {
   stopCodeTimer();
-  let rem = sec;
-  const el = document.getElementById('timer-count');
+  var rem = sec;
+  var el  = document.getElementById('timer-count');
   if (el) el.textContent = rem;
-  codeTimerInterval = setInterval(() => {
+  codeTimerInterval = setInterval(function () {
     rem--;
     if (el) el.textContent = rem;
     if (rem <= 0) {
       stopCodeTimer();
-      const timerEl = document.getElementById('code-timer');
+      var timerEl = document.getElementById('code-timer');
       if (timerEl) timerEl.textContent = '⚠️ Code may have expired. Try again if not connected.';
     }
   }, 1000);
@@ -216,28 +255,29 @@ function stopCodeTimer() {
 
 // ── Connect status ───────────────────────────────────────────────────────────
 function showConnectStatus(msg, type) {
-  const el = document.getElementById('connect-status');
+  var el = document.getElementById('connect-status');
   if (!el) return;
   el.textContent = msg;
-  el.className   = `connect-status connect-status-${type}`;
+  el.className   = 'connect-status connect-status-' + type;
   el.style.display = 'block';
 }
 function hideConnectStatus() {
-  const el = document.getElementById('connect-status');
+  var el = document.getElementById('connect-status');
   if (el) el.style.display = 'none';
 }
 
 // ── Toast ────────────────────────────────────────────────────────────────────
-let toastContainer;
-function showToast(message, type = 'success') {
+var toastContainer;
+function showToast(message, type) {
+  type = type || 'success';
   if (!toastContainer) {
     toastContainer = document.createElement('div');
     toastContainer.className = 'toast-container';
     document.body.appendChild(toastContainer);
   }
-  const t = document.createElement('div');
-  t.className   = `toast ${type}`;
+  var t = document.createElement('div');
+  t.className   = 'toast ' + type;
   t.textContent = message;
   toastContainer.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
+  setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 3500);
 }
